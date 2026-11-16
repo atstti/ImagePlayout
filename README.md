@@ -1,5 +1,7 @@
 # Image Playout LAN
 
+**アプリとして使う方は [ダウンロードページ（デスクトップ試用版）](https://github.com/atstti/ImagePlayout/releases/tag/v1.1.0) へ。Node.jsのインストールは不要です。** MacはDMG、WindowsはEXEを選んでください。以下の起動手順はソースコードから実行する方向けです。
+
 操作PCの静止画像をLAN内の別PCへ送出するNode.jsアプリケーションです。操作画面は日本語のダークテーマ、受信画面は画像のみを表示します。既存コードのない新規プロジェクトとして実装しました。
 
 ## 必要な環境
@@ -156,7 +158,7 @@ npm run dist -- --mac --publish never
 npm run dist -- --win --x64 --publish never
 ```
 
-生成物は `dist/` に保存します。sharpのネイティブ依存関係を同梱するため、対象OS・CPUと同じ環境で `npm ci` とビルドを実行してください。`.github/workflows/desktop.yml` はmain更新時、またはActionsの手動実行で、Apple Silicon Mac・Intel Mac・Windows x64の3環境でビルドします。ビルドした実アプリの自動ログイン、画像登録、CUT、受信URL、データ分離も各環境でスモークテストします。成功した配布ファイルはActionsのArtifactsから取得できます。GitHub Releasesへの公開は自動では行いません。
+生成物は `dist/` に保存します。sharpのネイティブ依存関係を同梱するため、対象OS・CPUと同じ環境で `npm ci` とビルドを実行してください。`.github/workflows/desktop.yml` はmain更新時、またはActionsの手動実行で、Apple Silicon Mac・Intel Mac・Windows x64の3環境でビルドします。ビルドした実アプリの自動ログイン、画像登録、CUT、受信URL、データ分離も各環境でスモークテストします。成功した配布ファイルはActionsのArtifactsから取得できます。GitHub Releasesへの公開は、ビルド成功後に「Publish desktop preview」ワークフローを手動実行して行います。入力するrun_idは成功した「Desktop packages」の実行IDです。検証済みの3ファイルとチェックサムを試用版として公開し、既存リリースは上書きしません。
 
 アプリはASARにまとめ、ネイティブ画像デコーダーは展開して同梱します。開発時のdata、テスト、Git履歴、秘密情報は配布対象に含めません。保存先の変更が必要な場合は環境変数 `IMAGE_PLAYOUT_USER_DATA` でアプリ用データディレクトリを指定できます。通常は設定不要です。
 

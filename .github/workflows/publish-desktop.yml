@@ -1,0 +1,99 @@
+name: Publish desktop preview
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Successful Desktop packages run ID to publish"
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ inputs.run_id }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Verify source build
+        id: source
+        shell: bash
+        run: |
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]] || exit 1
+          gh api "repos/$REPOSITORY/actions/runs/$RUN_ID" > "$RUNNER_TEMP/source-run.json"
+          node - <<'JS'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const run = JSON.parse(fs.readFileSync(path.join(process.env.RUNNER_TEMP, 'source-run.json')));
+          if (run.status !== 'completed' || run.conclusion !== 'success' ||
+              run.path !== '.github/workflows/desktop.yml' || run.head_branch !== 'main' ||
+              run.head_repository.full_name !== process.env.REPOSITORY ||
+              !/^[0-9a-f]{40}$/.test(run.head_sha)) throw Error('A successful main-branch desktop build is required');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `sha=${run.head_sha}\n`);
+          JS
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+      - name: Download verified packages
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          pattern: ImagePlayoutLAN-*
+          merge-multiple: true
+          path: release-files
+      - name: Validate package set and generate checksums
+        id: package
+        shell: bash
+        run: |
+          node - <<'JS'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const version = JSON.parse(fs.readFileSync('package.json')).version;
+          if (!/^\d+\.\d+\.\d+$/.test(version)) throw Error('Invalid version');
+          const expected = ['mac-arm64.dmg', 'mac-x64.dmg', 'win-x64.exe'].map(suffix => `ImagePlayoutLAN-${version}-${suffix}`).sort();
+          const actual = fs.readdirSync('release-files').sort();
+          if (JSON.stringify(expected) !== JSON.stringify(actual)) throw Error('Missing or unexpected packages: ' + actual);
+          const sums = actual.map(name => crypto.createHash('sha256').update(fs.readFileSync('release-files/' + name)).digest('hex') + '  ' + name);
+          fs.writeFileSync('release-files/SHA256SUMS.txt', sums.join('\n') + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+          JS
+      - name: Create preview release
+        shell: bash
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          # Refuse to overwrite an existing release or assets.
+          if gh release view "v$VERSION" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            echo 'This version already has a release. Use a new application version.'
+            exit 1
+          fi
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          Node.jsのインストール不要で、ダブルクリックすると操作画面が開くデスクトップ試用版です。
+
+          - Apple Silicon Mac：`mac-arm64.dmg`
+          - Intel Mac：`mac-x64.dmg`
+          - Windows 10 / 11（64bit Intel / AMD）：`win-x64.exe`
+
+          MacはDMGからApplicationsへドラッグ、WindowsはEXEを保存して起動してください。
+          メニューの「送出 → 受信PCの接続先…」でOUT用URLを確認・コピーできます。
+          元の `npm start` は先に終了してください。同じ8080番ポートを使います。
+
+          署名・公証は未設定のため、初回にOSの警告が出る場合があります。信頼する入手元であることを確認し、OSや組織のルールに従って許可してください。
+          画像・設定はアプリ本体とは別に保存します。開発者の画像やパスワードは含めません。
+
+          GitHub Actionsの各OSで、生成した実アプリの自動認証、日本語画像登録、画像デコード、CUT、受信URL、保存先分離を検証済みです。
+          LANでお使いください。インターネットへ直接公開する構成ではありません。
+          NOTES
+          printf '\n[詳しい使い方](https://github.com/%s/blob/main/docs/%%E9%%85%%8D%%E5%%B8%%83%%E7%%89%%88%%E3%%81%%AE%%E4%%BD%%BF%%E3%%81%%84%%E6%%96%%B9.md)\n\n[ビルド・テスト結果](https://github.com/%s/actions/runs/%s)\n' "$REPOSITORY" "$REPOSITORY" "$RUN_ID" >> "$RUNNER_TEMP/release-notes.md"
+          gh release create "v$VERSION" release-files/* --repo "$REPOSITORY" \
+            --target "$SOURCE_SHA" --prerelease \
+            --title "Image Playout LAN $VERSION — デスクトップ試用版" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
