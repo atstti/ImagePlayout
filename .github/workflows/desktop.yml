@@ -1,0 +1,59 @@
+name: Desktop packages
+on:
+  push:
+    branches: [main]
+    paths:
+      - "desktop/**"
+      - "src/**"
+      - "public/**"
+      - "test/**"
+      - "package*.json"
+      - "config.json"
+      - "electron-builder.json"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: mac-apple-silicon
+            os: macos-15
+            platform: mac
+            arch: arm64
+          - name: mac-intel
+            os: macos-15-intel
+            platform: mac
+            arch: x64
+          - name: windows
+            os: windows-latest
+            platform: win
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Build application
+        run: npm run dist -- --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - name: Verify bundled runtime and image decoder
+        run: node scripts/check-package.cjs ${{ matrix.platform }} ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ImagePlayoutLAN-${{ matrix.name }}
+          path: |
+            dist/*.dmg
+            dist/*.exe
+          if-no-files-found: error
+          retention-days: 30

@@ -1,14 +1,16 @@
 {
   "name": "image-playout-lan",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "desktop": "install-electron && electron .",
+    "dist": "electron-builder --config electron-builder.json"
   },
   "dependencies": {
     "express": "^5.1.0",
@@ -17,6 +19,12 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "electron": "^45.3.3",
+    "electron-builder": "^26.18.0",
     "playwright-core": "^1.65.1"
-  }
+  },
+  "description": "LAN内のブラウザへ画像を送出する日本語対応アプリケーション",
+  "author": "Image Playout LAN contributors",
+  "main": "desktop/main.cjs",
+  "license": "UNLICENSED"
 }
