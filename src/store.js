@@ -1,0 +1,47 @@
+import fs from "node:fs";
+import path from "node:path";
+export class Store {
+  constructor(dir, fadeMs = 500) {
+    this.dir = dir;
+    fs.mkdirSync(path.join(dir, "images"), { recursive: true });
+    this.file = path.join(dir, "state.json");
+    this.state = fs.existsSync(this.file)
+      ? JSON.parse(fs.readFileSync(this.file, "utf8"))
+      : {
+          images: [],
+          preview: null,
+          program: null,
+          seq: 0,
+          settings: {
+            fit: "contain",
+            background: "#000000",
+            fadeMs,
+            take: "fade",
+          },
+        };
+  }
+  save() {
+    fs.writeFileSync(this.file + ".tmp", JSON.stringify(this.state, null, 2));
+    fs.renameSync(this.file + ".tmp", this.file);
+  }
+  image(id) {
+    return this.state.images.find((i) => i.id === id);
+  }
+  next() {
+    const a = this.state.images;
+    this.state.preview = a.length
+      ? a[(a.findIndex((i) => i.id === this.state.preview) + 1) % a.length].id
+      : null;
+  }
+  take(id, transition, duration) {
+    if (id !== null && !this.image(id)) throw Error("画像が存在しません");
+    if (!["cut", "fade"].includes(transition))
+      throw Error("トランジションが不正です");
+    if (!Number.isInteger(duration) || duration < 0 || duration > 10000)
+      throw Error("FADE時間は0〜10000msです");
+    this.state.program = id;
+    this.state.seq++;
+    this.save();
+    return { type: "program", id, seq: this.state.seq, transition, duration };
+  }
+}

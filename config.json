@@ -1,0 +1,8 @@
+{
+  "port": 8080,
+  "host": "0.0.0.0",
+  "maxUploadMB": 30,
+  "maxPixels": 50000000,
+  "fadeMs": 500,
+  "preloadTimeoutMs": 8000
+}
