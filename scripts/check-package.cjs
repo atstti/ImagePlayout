@@ -42,6 +42,7 @@ async function main() {
   });
   try {
     const page = await application.firstWindow();
+    page.setDefaultTimeout(30000);
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.waitForSelector("#upload", {
@@ -73,6 +74,43 @@ async function main() {
     assert.equal(receiver.status, 200);
     assert.ok(fs.existsSync(path.join(dir, "data", "admin-password.txt")));
     assert.deepEqual(errors, []);
+    // Verify real alpha pixels from the frontend bundled in this app.
+    const outputPromise = application.waitForEvent("window");
+    await application.evaluate(({ BrowserWindow }, url) => {
+      const receiver = new BrowserWindow({
+        width: 640,
+        height: 360,
+        useContentSize: true,
+        show: true,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
+        },
+      });
+      receiver.loadURL(url);
+    }, `http://127.0.0.1:${port}/receiver?transparent=1`);
+    const output = await outputPromise;
+    output.setDefaultTimeout(30000);
+    await output.waitForFunction(
+      () => document.querySelector("#output img")?.complete,
+    );
+    const screenshot = await output.screenshot({ omitBackground: true });
+    const dimensions = await sharp(screenshot).metadata();
+    const alpha = await sharp(screenshot)
+      .extract({
+        left: Math.floor(dimensions.width / 2),
+        top: Math.floor(dimensions.height / 2),
+        width: 1,
+        height: 1,
+      })
+      .ensureAlpha()
+      .raw()
+      .toBuffer();
+    assert.ok(
+      Math.abs(alpha[3] - 128) <= 1,
+      `Packaged transparent OUT alpha was ${alpha[3]}`,
+    );
     // Confirm the build did not accidentally include developer data or tests.
     const archiveRoot = await application.evaluate(({ app }) =>
       app.getAppPath(),
@@ -88,7 +126,7 @@ async function main() {
       );
     }
     console.log(
-      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, receiver, isolated data.",
+      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, isolated data.",
     );
   } finally {
     await application.close();

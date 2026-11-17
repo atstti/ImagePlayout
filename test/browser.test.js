@@ -110,3 +110,162 @@ test(
     assert.deepEqual(errors, []);
   },
 );
+
+test(
+  "OBS透過OUT：実ピクセルのアルファ、通常OUT、FADE、再読込、BLACKを確認",
+  { skip: !process.env.CHROMIUM_PATH },
+  async (t) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "playout-alpha-"));
+    const runtime = createApp({ dir, password: "alpha-test" });
+    await new Promise((resolve) =>
+      runtime.server.listen(0, "127.0.0.1", resolve),
+    );
+    const base = "http://127.0.0.1:" + runtime.server.address().port;
+    const browser = await chromium.launch({
+      executablePath: process.env.CHROMIUM_PATH,
+      args: ["--no-sandbox"],
+    });
+    t.after(async () => {
+      await browser.close();
+      for (const ws of runtime.wss.clients) ws.terminate();
+      await new Promise((resolve) => runtime.server.close(resolve));
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+    const context = await browser.newContext({
+      viewport: { width: 640, height: 360 },
+    });
+    const transparent = await context.newPage(),
+      normal = await context.newPage();
+    const errors = [];
+    for (const page of [transparent, normal])
+      page.on("pageerror", (error) => errors.push(error.message));
+    await transparent.goto(base + "/receiver?transparent=1");
+    await normal.goto(base + "/receiver");
+    await transparent.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#output")).backgroundColor ===
+        "rgb(0, 0, 0)",
+    );
+    const auth = {
+      Authorization:
+        "Basic " + Buffer.from("admin:alpha-test").toString("base64"),
+    };
+    const pixels = Buffer.alloc(64 * 36 * 4);
+    for (let y = 0; y < 36; y++)
+      for (let x = 0; x < 64; x++) {
+        const offset = (y * 64 + x) * 4;
+        pixels[offset] = 255;
+        pixels[offset + 3] = x < 20 ? 0 : x < 40 ? 128 : 255;
+      }
+    const png = await sharp(pixels, {
+      raw: { width: 64, height: 36, channels: 4 },
+    })
+      .png()
+      .toBuffer();
+    const form = new FormData();
+    form.append("image", new Blob([png]), "透明・半透明.png");
+    const upload = await fetch(base + "/api/images", {
+      method: "POST",
+      headers: auth,
+      body: form,
+    });
+    assert.equal(upload.status, 201);
+    const invoke = async (action) => {
+      const res = await fetch(base + "/api/command", {
+        method: "POST",
+        headers: { ...auth, "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      assert.equal(res.status, 200, await res.text());
+    };
+    const inspect = async (page) => {
+      const shot = await page.screenshot({ omitBackground: true });
+      const { data, info } = await sharp(shot)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      return [100, 300, 500].map((x) =>
+        Array.from(
+          data.subarray(
+            (180 * info.width + x) * 4,
+            (180 * info.width + x) * 4 + 4,
+          ),
+        ),
+      );
+    };
+    await invoke("cut");
+    for (const page of [transparent, normal])
+      await page.waitForFunction(
+        () => document.querySelector("#output img")?.complete,
+      );
+    assert.deepEqual(
+      (await inspect(transparent)).map((p) => p[3]),
+      [0, 128, 255],
+    );
+    assert.deepEqual(
+      (await inspect(normal)).map((p) => p[3]),
+      [255, 255, 255],
+    );
+    // A global background change must affect only the regular OUT.
+    const settings = {
+      fit: "contain",
+      background: "#ffffff",
+      fadeMs: 150,
+      take: "fade",
+    };
+    const changed = await fetch(base + "/api/settings", {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    });
+    assert.equal(changed.status, 200);
+    await normal.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#output")).backgroundColor ===
+        "rgb(255, 255, 255)",
+    );
+    assert.deepEqual(
+      (await inspect(transparent)).map((p) => p[3]),
+      [0, 128, 255],
+    );
+    // Exercise BLACK -> FADE and a state update during the fade.
+    await invoke("black");
+    await transparent.waitForFunction(
+      () => !document.querySelector("#output img"),
+    );
+    assert.deepEqual((await inspect(transparent))[0], [0, 0, 0, 255]);
+    await invoke("fade");
+    await fetch(base + "/api/settings", {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    });
+    await transparent.waitForFunction(
+      () =>
+        document.querySelector("#output img") &&
+        document.querySelector("#output img").getAnimations().length === 0,
+    );
+    assert.deepEqual(
+      (await inspect(transparent)).map((p) => p[3]),
+      [0, 128, 255],
+    );
+    await transparent.reload();
+    await transparent.waitForFunction(
+      () => document.querySelector("#output img")?.complete,
+    );
+    assert.deepEqual(
+      (await inspect(transparent)).map((p) => p[3]),
+      [0, 128, 255],
+    );
+    // FIT letterbox areas must also remain transparent.
+    await transparent.setViewportSize({ width: 640, height: 480 });
+    const letterbox = await transparent.screenshot({ omitBackground: true });
+    const corner = await sharp(letterbox)
+      .extract({ left: 1, top: 1, width: 1, height: 1 })
+      .ensureAlpha()
+      .raw()
+      .toBuffer();
+    assert.equal(corner[3], 0);
+    assert.deepEqual(errors, []);
+  },
+);

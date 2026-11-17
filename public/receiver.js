@@ -1,10 +1,18 @@
 import { Player, connect } from "./player.js";
+const transparentBackground =
+  new URLSearchParams(location.search).get("transparent") === "1";
+if (transparentBackground)
+  document.documentElement.classList.add("transparent-output");
 let session = false,
   lastStatus = { id: null, seq: -1, error: null };
-const player = new Player(document.querySelector("#output"), (status) => {
-  lastStatus = status;
-  connection.send({ type: "status", ...status });
-});
+const player = new Player(
+  document.querySelector("#output"),
+  (status) => {
+    lastStatus = status;
+    connection.send({ type: "status", ...status });
+  },
+  { transparentBackground },
+);
 const connection = connect(
   "receiver",
   async (message, socket) => {

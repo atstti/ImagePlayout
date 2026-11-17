@@ -1,19 +1,34 @@
 export class Player {
-  constructor(container, onStatus = () => {}) {
+  constructor(
+    container,
+    onStatus = () => {},
+    { transparentBackground = false } = {},
+  ) {
     this.container = container;
     this.onStatus = onStatus;
     this.seq = -1;
     this.generation = 0;
     this.cache = new Map();
     this.current = null;
+    this.displayId = null;
+    this.transparentBackground = transparentBackground;
     this.settings = { fit: "contain", background: "#000000" };
   }
   configure(settings) {
     this.settings = settings;
-    this.container.style.backgroundColor =
-      this.current === null ? "#000000" : settings.background;
+    this.applyBackground();
     for (const img of this.container.children)
       img.style.objectFit = settings.fit;
+  }
+  applyBackground() {
+    // BLACK remains opaque in both modes. A settings heartbeat during FADE
+    // must use the incoming image, rather than the last completed image.
+    this.container.style.backgroundColor =
+      this.displayId === null
+        ? "#000000"
+        : this.transparentBackground
+          ? "transparent"
+          : this.settings.background;
   }
   async preload(id) {
     if (!id) return null;
@@ -53,9 +68,8 @@ export class Player {
           animation.commitStyles();
           animation.cancel();
         }
-      this.container.style.backgroundColor = command.id
-        ? this.settings.background
-        : "#000000";
+      this.displayId = command.id;
+      this.applyBackground();
       const old = [...this.container.children];
       const img = source ? source.cloneNode() : document.createElement("img");
       if (!source) {

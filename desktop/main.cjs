@@ -97,15 +97,19 @@ async function start() {
     if (new URL(url).origin !== origin) event.preventDefault();
   });
   operatorWindow.once("ready-to-show", () => operatorWindow.show());
-  const connectionInfo = async () => {
-    const urls = receiverUrls(port);
+  const connectionInfo = async (transparent = false) => {
+    const urls = receiverUrls(port).map((url) =>
+      transparent ? `${url}?transparent=1` : url,
+    );
     const text = urls.length
       ? urls.join("\n")
       : "LANのIPv4アドレスが見つかりません。同じLANへ接続してから確認してください。";
     const { response } = await dialog.showMessageBox(operatorWindow, {
       type: "info",
-      title: "受信PCの接続先",
-      message: "受信PCのブラウザで開くURL",
+      title: transparent ? "OBS用の透過OUT" : "受信PCの接続先",
+      message: transparent
+        ? "OBSのブラウザソースに設定するURL"
+        : "受信PCのブラウザで開くURL",
       detail: `${text}\n\n操作PCと同じLANに接続してください。VPNや仮想ネットワークのアドレスが含まれる場合は、実際に使うLANのアドレスを選んでください。`,
       buttons: urls.length ? ["URLをコピー", "閉じる"] : ["閉じる"],
       cancelId: urls.length ? 1 : 0,
@@ -126,6 +130,10 @@ async function start() {
         {
           label: "受信PCの接続先…",
           click: () => connectionInfo().catch(showError),
+        },
+        {
+          label: "OBS用の透過OUT URL…",
+          click: () => connectionInfo(true).catch(showError),
         },
         {
           label: "このPCでOUTを開く",
