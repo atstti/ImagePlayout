@@ -76,6 +76,11 @@ async function main() {
     assert.equal(copiedUrl.username, "");
     assert.equal(copiedUrl.password, "");
     assert.equal(application.windows().length, windowCount);
+    const libraryBox = await page.locator(".library-panel").boundingBox();
+    const previewBox = await page.locator("#preview").boundingBox();
+    const programBox = await page.locator("#program").boundingBox();
+    assert.ok(libraryBox.x + libraryBox.width <= previewBox.x);
+    assert.ok(previewBox.x + previewBox.width <= programBox.x);
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.waitForSelector("#upload", {
@@ -211,7 +216,7 @@ async function main() {
       );
     }
     console.log(
-      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, native clipboard copy, monitor checkerboard, isolated data.",
+      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, native clipboard copy, monitor checkerboard, left library layout, isolated data.",
     );
   } finally {
     await application.close();

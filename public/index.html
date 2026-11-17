@@ -5,65 +5,15 @@
     content="width=device-width,initial-scale=1"
   /><title>Image Playout LAN</title
   ><link rel="stylesheet" href="/assets/style.css" />
-  <body>
+  <body class="controller">
     <header>
       <h1>Image Playout <span>LAN</span></h1>
       <span id="connection">接続中…</span>
       <button id="copyOutputUrl" disabled>透過OUTのURLをコピー</button>
       <span id="copyStatus" role="status" aria-live="polite"></span>
     </header>
-    <main>
-      <div class="monitors">
-        <section>
-          <h2 class="next">PREVIEW <small>NEXT</small></h2>
-          <div id="preview" class="screen monitor-transparent"></div>
-          <p id="previewName">未選択</p>
-        </section>
-        <section>
-          <h2 class="air">PROGRAM <small>● ON AIR</small></h2>
-          <div id="program" class="screen"></div>
-          <p id="programName">BLACK</p>
-        </section>
-      </div>
-      <section class="controls">
-        <button data-command="cut">CUT</button
-        ><button data-command="fade">FADE</button
-        ><button data-command="take" class="primary">TAKE</button
-        ><button data-command="black" class="danger">BLACK</button
-        ><button
-          data-command="clear"
-          title="画像を外して透過OUTを完全透明にします"
-        >
-          CLEAR（透明）</button
-        ><button data-command="next">NEXT →</button
-        ><label
-          ><input type="checkbox" id="autoNext" />AUTO NEXT（送出後）</label
-        >
-      </section>
-      <section class="settings">
-        <label
-          >FADE
-          <input id="fadeMs" type="number" min="0" max="10000" value="500" />
-          ms</label
-        ><label
-          >TAKE
-          <select id="take">
-            <option value="fade">FADE</option>
-            <option value="cut">CUT</option>
-          </select></label
-        ><label
-          >表示
-          <select id="fit">
-            <option value="contain">FIT</option>
-            <option value="cover">FILL</option>
-            <option value="fill">STRETCH</option>
-          </select></label
-        ><label
-          >背景 <input id="background" type="color" value="#000000" /></label
-        ><button id="saveSettings">設定保存</button>
-      </section>
-      <p id="error" role="alert"></p>
-      <section>
+    <main class="workspace">
+      <section class="library-panel" aria-label="画像ライブラリ">
         <div class="libraryHead">
           <h2>画像ライブラリ <small id="imageCount"></small></h2>
           <label class="upload"
@@ -79,14 +29,66 @@
         </p>
         <div id="library"></div>
       </section>
-      <section>
-        <h2>受信PC <small id="receiverCount">0台</small></h2>
-        <p class="hint">
-          受信画面をダブルクリック、またはFキーで全画面。操作：Space＝TAKE /
-          →＝NEXT / Esc＝緊急BLACK
-        </p>
-        <div id="receivers"></div>
-      </section>
+      <div class="playout-panel" aria-label="送出モニターと操作">
+        <div class="monitors">
+          <section>
+            <h2 class="next">PREVIEW <small>NEXT</small></h2>
+            <div id="preview" class="screen monitor-transparent"></div>
+            <p id="previewName">未選択</p>
+          </section>
+          <section>
+            <h2 class="air">PROGRAM <small>● ON AIR</small></h2>
+            <div id="program" class="screen"></div>
+            <p id="programName">BLACK</p>
+          </section>
+        </div>
+        <section class="controls">
+          <button data-command="cut">CUT</button
+          ><button data-command="fade">FADE</button
+          ><button data-command="take" class="primary">TAKE</button
+          ><button data-command="black" class="danger">BLACK</button
+          ><button
+            data-command="clear"
+            title="画像を外して透過OUTを完全透明にします"
+          >
+            CLEAR（透明）</button
+          ><button data-command="next">NEXT →</button
+          ><label
+            ><input type="checkbox" id="autoNext" />AUTO NEXT（送出後）</label
+          >
+        </section>
+        <section class="settings">
+          <label
+            >FADE
+            <input id="fadeMs" type="number" min="0" max="10000" value="500" />
+            ms</label
+          ><label
+            >TAKE
+            <select id="take">
+              <option value="fade">FADE</option>
+              <option value="cut">CUT</option>
+            </select></label
+          ><label
+            >表示
+            <select id="fit">
+              <option value="contain">FIT</option>
+              <option value="cover">FILL</option>
+              <option value="fill">STRETCH</option>
+            </select></label
+          ><label
+            >背景 <input id="background" type="color" value="#000000" /></label
+          ><button id="saveSettings">設定保存</button>
+        </section>
+        <p id="error" role="alert"></p>
+        <section>
+          <h2>受信PC <small id="receiverCount">0台</small></h2>
+          <p class="hint">
+            受信画面をダブルクリック、またはFキーで全画面。操作：Space＝TAKE /
+            →＝NEXT / Esc＝緊急BLACK
+          </p>
+          <div id="receivers"></div>
+        </section>
+      </div>
     </main>
     <script type="module" src="/assets/admin.js"></script>
   </body>

@@ -89,6 +89,7 @@ function render() {
       $(key).value = state.settings[key];
   }
   const library = $("library");
+  const libraryScrollTop = library.scrollTop;
   library.replaceChildren();
   state.images.forEach((img, index) => {
     const card = document.createElement("div");
@@ -104,6 +105,7 @@ function render() {
       api("command", { action: "preview", id: img.id }).catch(report);
     const name = document.createElement("p");
     name.className = "name";
+    name.title = img.name;
     name.textContent = String(index + 1).padStart(2, "0") + "  " + img.name;
     const meta = document.createElement("div");
     meta.className = "meta";
@@ -132,6 +134,7 @@ function render() {
     );
     library.append(card);
   });
+  library.scrollTop = libraryScrollTop;
   $("receivers").replaceChildren();
   for (const p of state.receivers) {
     const row = document.createElement("div");

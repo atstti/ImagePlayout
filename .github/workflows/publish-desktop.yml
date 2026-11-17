@@ -84,6 +84,7 @@ jobs:
 
           MacはDMGからApplicationsへドラッグ、WindowsはEXEを保存して起動してください。
           右上の「透過OUTのURLをコピー」で、OBS用URLをコピーできます。ブラウザは開きません。
+          画像ライブラリを左、PREVIEW / PROGRAMと送出操作を右に配置し、一覧を独立してスクロールできます。
           PREVIEW / PROGRAMの透過部分は市松模様で確認できます。模様はOUTには表示しません。
           コピーしたURLをOBSのブラウザソースへ貼り付けてください。メニューの「送出 → OBS用の透過OUT URL…」でも候補を確認できます。
           URLの形式は `http://操作PCのIP:8080/receiver?transparent=1` です。
