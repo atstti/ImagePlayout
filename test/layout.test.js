@@ -22,7 +22,10 @@ test(
     runtime.store.state.images = Array.from({ length: 24 }, (_, index) => {
       const img = {
         id: randomUUID(),
-        name: `画像${index + 1}・日本語の長いファイル名の表示を確認.png`,
+        name:
+          index < 2
+            ? `slide0${index + 1}.png`
+            : `画像${index + 1}・日本語の長いファイル名の表示を確認.png`,
         size: png.length,
         width: 160,
         height: 90,
@@ -74,6 +77,9 @@ test(
           };
           return {
             library: rect(".library-panel"),
+            buttons: [
+              ...document.querySelectorAll(".controls [data-command]"),
+            ].map((el) => rect(`[data-command="${el.dataset.command}"]`)),
             preview: rect("#preview"),
             program: rect("#program"),
             stageScroll: document.querySelector(".playout-panel").scrollTop,
@@ -82,6 +88,43 @@ test(
           };
         });
       const before = await geometry();
+      const cards = await page.locator(".card").evaluateAll((cards) =>
+        cards.slice(0, 3).map((card) => {
+          const r = card.getBoundingClientRect();
+          return { x: r.x, y: r.y, bottom: r.bottom };
+        }),
+      );
+      assert.equal(cards[0].x, cards[1].x);
+      assert.equal(cards[1].x, cards[2].x);
+      assert.ok(cards[0].bottom <= cards[1].y);
+      assert.ok(cards[1].bottom <= cards[2].y);
+      assert.equal(
+        await page.locator(".card").first().locator(".name").textContent(),
+        "slide01.png",
+      );
+      assert.equal(
+        await page
+          .locator(".card")
+          .first()
+          .locator(".card-number")
+          .textContent(),
+        "No. 01",
+      );
+      // Latin caption -> Japanese CLEAR -> BLACK -> image must not move any button.
+      for (const [action, label] of [
+        ["clear", "CLEAR（透明）"],
+        ["black", "BLACK"],
+        ["cut", "slide01.png"],
+      ]) {
+        await page.locator(`[data-command="${action}"]`).click();
+        await page.waitForFunction(
+          (label) =>
+            document.querySelector("#programName").textContent === label,
+          label,
+        );
+        assert.deepEqual(await geometry(), before);
+      }
+
       assert.ok(before.library.right <= before.preview.x);
       assert.ok(before.preview.right <= before.program.x);
       assert.ok(before.preview.y >= 0 && before.preview.bottom <= height);
@@ -112,7 +155,7 @@ test(
       await page.waitForFunction(() =>
         document
           .querySelector("#previewName")
-          .textContent.startsWith("画像1・"),
+          .textContent.startsWith("slide01.png"),
       );
       assert.equal(
         await page.locator("#library").evaluate((el) => el.scrollTop),

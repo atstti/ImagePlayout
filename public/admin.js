@@ -106,7 +106,7 @@ function render() {
     const name = document.createElement("p");
     name.className = "name";
     name.title = img.name;
-    name.textContent = String(index + 1).padStart(2, "0") + "  " + img.name;
+    name.textContent = img.name;
     const meta = document.createElement("div");
     meta.className = "meta";
     meta.textContent = `${img.width} × ${img.height} · ${(img.size / 1024 / 1024).toFixed(2)} MB`;
@@ -117,10 +117,18 @@ function render() {
       [ids[index], ids[to]] = [ids[to], ids[index]];
       await api("reorder", { ids });
     };
-    card.append(
-      thumb,
-      name,
-      meta,
+    const cardPreview = document.createElement("div");
+    cardPreview.className = "card-preview";
+    const number = document.createElement("span");
+    number.className = "card-number";
+    number.textContent = "No. " + String(index + 1).padStart(2, "0");
+    cardPreview.append(thumb, number);
+    const info = document.createElement("div");
+    info.className = "card-info";
+    info.append(name, meta);
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+    actions.append(
       button("↑", () => move(-1)),
       button("↓", () => move(1)),
       button("名称変更", () => {
@@ -132,6 +140,7 @@ function render() {
           return api("images/" + img.id, undefined, "DELETE");
       }),
     );
+    card.append(cardPreview, info, actions);
     library.append(card);
   });
   library.scrollTop = libraryScrollTop;

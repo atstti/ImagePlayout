@@ -169,6 +169,19 @@ async function main() {
       Math.abs(alpha[3] - 128) <= 1,
       `Packaged transparent OUT alpha was ${alpha[3]}`,
     );
+    assert.equal(
+      await page.locator(".card .name").textContent(),
+      "配布版テスト.png",
+    );
+    assert.equal(await page.locator(".card-number").textContent(), "No. 01");
+    const commandGeometry = () =>
+      page.locator(".controls [data-command]").evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const r = button.getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        }),
+      );
+    const beforeClear = await commandGeometry();
     await page.locator('[data-command="clear"]').click();
     await output.waitForFunction(
       () =>
@@ -176,6 +189,7 @@ async function main() {
         getComputedStyle(document.querySelector("#output")).backgroundColor ===
           "rgba(0, 0, 0, 0)",
     );
+    assert.deepEqual(await commandGeometry(), beforeClear);
     const cleared = await output.screenshot({ omitBackground: true });
     const clearAlpha = await alphaRange(cleared);
     assert.equal(clearAlpha.min, 0);
@@ -201,6 +215,7 @@ async function main() {
     );
     assert.equal(blackAlpha.min, 255);
     assert.equal(blackAlpha.max, 255);
+    assert.deepEqual(await commandGeometry(), beforeClear);
     // Confirm the build did not accidentally include developer data or tests.
     const archiveRoot = await application.evaluate(({ app }) =>
       app.getAppPath(),
@@ -216,7 +231,7 @@ async function main() {
       );
     }
     console.log(
-      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, native clipboard copy, monitor checkerboard, left library layout, isolated data.",
+      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, native clipboard copy, monitor checkerboard, vertical library, separate numbers, stable CLEAR controls, isolated data.",
     );
   } finally {
     await application.close();

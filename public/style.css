@@ -291,7 +291,7 @@ html.transparent-output body.receiver {
   min-height: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 10px;
   margin: 12px 0 0;
@@ -316,6 +316,8 @@ html.transparent-output body.receiver {
 }
 #previewName,
 #programName {
+  height: 24px;
+  line-height: 24px;
   margin: 8px 0 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -364,4 +366,56 @@ html.transparent-output body.receiver {
 }
 .library-panel .meta {
   overflow-wrap: anywhere;
+}
+
+/* One image per row; number and filename occupy distinct visual areas. */
+.library-panel .card {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.card-preview {
+  position: relative;
+  min-width: 0;
+}
+.card-preview .thumb {
+  display: block;
+  border-radius: 3px;
+}
+.card-number {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 2px 5px;
+  border: 1px solid #65758b;
+  border-radius: 3px;
+  background: #0c1016;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.card-info {
+  min-width: 0;
+}
+.library-panel .card-info .name {
+  margin: 0 0 6px;
+  line-height: 20px;
+}
+.library-panel .card-info .meta {
+  margin: 0;
+  line-height: 16px;
+}
+.card-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.library-panel .card-actions button {
+  margin: 0;
+  padding: 5px 7px;
 }
