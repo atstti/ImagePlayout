@@ -60,6 +60,18 @@ test(
     );
     assert.equal(admin.pages().length, beforePages);
     assert.equal(page.url(), base + "/");
+    const copyButtonGeometry = await page
+      .locator("#copyOutputUrl")
+      .boundingBox();
+    await page.waitForFunction(
+      () => document.querySelector("#copyStatus").textContent === "",
+      null,
+      { timeout: 2500 },
+    );
+    assert.deepEqual(
+      await page.locator("#copyOutputUrl").boundingBox(),
+      copyButtonGeometry,
+    );
     // LAN HTTP has no Clipboard API. Exercise its actual native copy fallback.
     await page.evaluate(() => {
       window.nativeClipboard = navigator.clipboard;
@@ -96,6 +108,12 @@ test(
     assert.match(
       await page.locator("#error").textContent(),
       /receiver\?transparent=1/,
+    );
+    // The preceding success timer must not erase a later failure message.
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    assert.equal(
+      await page.locator("#copyStatus").textContent(),
+      "コピーできませんでした",
     );
     assert.equal(admin.pages().length, beforePages);
     await page.evaluate(() => {

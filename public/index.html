@@ -90,6 +90,28 @@
         </section>
       </div>
     </main>
+    <dialog
+      id="renameDialog"
+      class="rename-dialog"
+      aria-labelledby="renameTitle"
+    >
+      <form id="renameForm">
+        <h2 id="renameTitle">画像の名称変更</h2>
+        <label for="renameName">ファイル名</label>
+        <input
+          id="renameName"
+          type="text"
+          maxlength="200"
+          required
+          autocomplete="off"
+        />
+        <p id="renameError" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="renameCancel" type="button">キャンセル</button>
+          <button id="renameSave" type="submit" class="primary">保存</button>
+        </div>
+      </form>
+    </dialog>
     <script type="module" src="/assets/admin.js"></script>
   </body>
 </html>

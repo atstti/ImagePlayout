@@ -76,6 +76,11 @@ async function main() {
     assert.equal(copiedUrl.username, "");
     assert.equal(copiedUrl.password, "");
     assert.equal(application.windows().length, windowCount);
+    await page.waitForFunction(
+      () => document.querySelector("#copyStatus").textContent === "",
+      null,
+      { timeout: 2500 },
+    );
     const libraryBox = await page.locator(".library-panel").boundingBox();
     const previewBox = await page.locator("#preview").boundingBox();
     const programBox = await page.locator("#program").boundingBox();
@@ -174,6 +179,24 @@ async function main() {
       "配布版テスト.png",
     );
     assert.equal(await page.locator(".card-number").textContent(), "No. 01");
+    await page.getByRole("button", { name: "名称変更", exact: true }).click();
+    await page.waitForFunction(
+      () => document.querySelector("#renameDialog").open,
+    );
+    await page.locator("#renameName").fill("");
+    await page.locator("#renameName").fill("配布版・名称変更済み.png");
+    await page.locator("#renameSave").click();
+    await page.waitForFunction(
+      () => !document.querySelector("#renameDialog").open,
+    );
+    assert.equal(
+      await page.locator(".card .name").textContent(),
+      "配布版・名称変更済み.png",
+    );
+    assert.equal(
+      await page.locator("#programName").textContent(),
+      "配布版・名称変更済み.png",
+    );
     const commandGeometry = () =>
       page.locator(".controls [data-command]").evaluateAll((buttons) =>
         buttons.map((button) => {
@@ -231,7 +254,7 @@ async function main() {
       );
     }
     console.log(
-      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, native clipboard copy, monitor checkerboard, vertical library, separate numbers, stable CLEAR controls, isolated data.",
+      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, native clipboard copy, monitor checkerboard, vertical library, separate numbers, stable CLEAR controls, rename dialog, timed copy feedback, isolated data.",
     );
   } finally {
     await application.close();

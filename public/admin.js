@@ -4,6 +4,9 @@ const $ = (id) => document.getElementById(id);
 let state;
 let busy = false;
 let settingsDirty = false;
+const renameDialog = $("renameDialog");
+let renameTargetId = null;
+let renameBusy = false;
 const report = (error) =>
   ($("error").textContent = error?.message || error || "");
 const preview = new Player(
@@ -56,9 +59,21 @@ async function command(action) {
 }
 function button(label, fn) {
   const b = document.createElement("button");
+  b.type = "button";
   b.textContent = label;
-  b.onclick = () => Promise.resolve().then(fn).catch(report);
+  b.onclick = (event) => {
+    event.stopPropagation();
+    Promise.resolve().then(fn).catch(report);
+  };
   return b;
+}
+function openRename(img) {
+  renameTargetId = img.id;
+  $("renameName").value = img.name;
+  $("renameError").textContent = "";
+  renameDialog.showModal();
+  $("renameName").focus();
+  $("renameName").select();
 }
 function render() {
   const image = (id) => state.images.find((i) => i.id === id);
@@ -97,12 +112,27 @@ function render() {
       "card" +
       (img.id === state.preview ? " selected" : "") +
       (img.id === state.program ? " live" : "");
+    card.dataset.imageId = img.id;
+    card.tabIndex = 0;
+    card.setAttribute("role", "group");
+    card.setAttribute("aria-label", img.name);
+    const selectImage = () =>
+      api("command", { action: "preview", id: img.id }).catch(report);
+    card.onclick = (event) => {
+      if (event.target.closest("button, input, select, textarea, a")) return;
+      selectImage();
+    };
+    card.onkeydown = (event) => {
+      if (event.target === card && event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        selectImage();
+      }
+    };
     const thumb = document.createElement("img");
     thumb.src = "/media/" + img.id;
     thumb.alt = img.name;
     thumb.className = "thumb";
-    thumb.onclick = () =>
-      api("command", { action: "preview", id: img.id }).catch(report);
     const name = document.createElement("p");
     name.className = "name";
     name.title = img.name;
@@ -131,10 +161,7 @@ function render() {
     actions.append(
       button("↑", () => move(-1)),
       button("↓", () => move(1)),
-      button("名称変更", () => {
-        const name = prompt("画像の名称", img.name);
-        if (name) return api("images/" + img.id, { name }, "PATCH");
-      }),
+      button("名称変更", () => openRename(img)),
       button("削除", () => {
         if (confirm(img.name + " を削除しますか？"))
           return api("images/" + img.id, undefined, "DELETE");
@@ -215,6 +242,7 @@ document.addEventListener("drop", (e) => {
   upload(e.dataTransfer.files);
 });
 document.addEventListener("keydown", (e) => {
+  if (renameDialog.open) return;
   if (e.key === "Escape") {
     command("black");
     return;
@@ -232,6 +260,44 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowRight") command("next");
 });
 
+$("renameCancel").onclick = () => {
+  if (!renameBusy) renameDialog.close();
+};
+renameDialog.addEventListener("cancel", (event) => {
+  if (renameBusy) event.preventDefault();
+});
+renameDialog.addEventListener("close", () => {
+  const card = document.querySelector(
+    `[data-image-id="${CSS.escape(renameTargetId || "")}"]`,
+  );
+  card?.focus({ preventScroll: true });
+  renameTargetId = null;
+});
+$("renameForm").onsubmit = async (event) => {
+  event.preventDefault();
+  if (renameBusy || !renameTargetId) return;
+  const name = $("renameName").value.trim();
+  if (!name) {
+    $("renameError").textContent = "名称を入力してください";
+    $("renameName").focus();
+    return;
+  }
+  renameBusy = true;
+  $("renameSave").disabled = true;
+  $("renameCancel").disabled = true;
+  $("renameError").textContent = "";
+  try {
+    await api("images/" + renameTargetId, { name }, "PATCH");
+    renameDialog.close();
+  } catch (error) {
+    $("renameError").textContent = error.message;
+  } finally {
+    renameBusy = false;
+    $("renameSave").disabled = false;
+    $("renameCancel").disabled = false;
+  }
+};
+
 // Resolve once before the click, preserving the user gesture for HTTP copy fallback.
 let outputUrl;
 fetch("/api/output-url")
@@ -244,12 +310,21 @@ fetch("/api/output-url")
     $("copyOutputUrl").disabled = false;
   })
   .catch(report);
+let copyStatusTimer;
+let copyAttempt = 0;
 $("copyOutputUrl").onclick = async () => {
+  const attempt = ++copyAttempt;
+  clearTimeout(copyStatusTimer);
   $("copyStatus").textContent = "";
   try {
     await copyText(outputUrl);
+    if (attempt !== copyAttempt) return;
     $("copyStatus").textContent = "コピーしました";
+    copyStatusTimer = setTimeout(() => {
+      if (attempt === copyAttempt) $("copyStatus").textContent = "";
+    }, 1000);
   } catch (error) {
+    if (attempt !== copyAttempt) return;
     $("copyStatus").textContent = "コピーできませんでした";
     report(`${error.message}。URL: ${outputUrl}`);
   }
