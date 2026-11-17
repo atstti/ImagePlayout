@@ -212,8 +212,8 @@ export function createApp(options = {}) {
       next(e);
     }
   });
-  const commit = (id, transition, duration) => {
-    const command = store.take(id, transition, duration);
+  const commit = (id, transition, duration, outputMode) => {
+    const command = store.take(id, transition, duration, outputMode);
     broadcast(command);
     sync();
   };
@@ -233,9 +233,9 @@ export function createApp(options = {}) {
         sync();
         return res.json({ ok: true });
       }
-      if (action === "black") {
+      if (["black", "clear"].includes(action)) {
         if (pending) pending.finish(false);
-        commit(null, "cut", 0);
+        commit(null, "cut", 0, action);
         return res.json({ ok: true });
       }
       if (!["cut", "fade", "take"].includes(action))
@@ -270,12 +270,10 @@ export function createApp(options = {}) {
           send(ws, { type: "prepare", id: target, token });
       });
       if (!ready)
-        return res
-          .status(409)
-          .json({
-            error:
-              "受信PCの読み込みACKを確認できません。接続状態を確認してください",
-          });
+        return res.status(409).json({
+          error:
+            "受信PCの読み込みACKを確認できません。接続状態を確認してください",
+        });
       commit(target, transition, s.settings.fadeMs);
       res.json({ ok: true });
     } catch (e) {
@@ -283,14 +281,12 @@ export function createApp(options = {}) {
     }
   });
   app.use((err, req, res, next) =>
-    res
-      .status(400)
-      .json({
-        error:
-          err.code === "LIMIT_FILE_SIZE"
-            ? `画像は${config.maxUploadMB}MB以下にしてください`
-            : err.message || "処理に失敗しました",
-      }),
+    res.status(400).json({
+      error:
+        err.code === "LIMIT_FILE_SIZE"
+          ? `画像は${config.maxUploadMB}MB以下にしてください`
+          : err.message || "処理に失敗しました",
+    }),
   );
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url, "http://localhost");
@@ -346,6 +342,9 @@ export function createApp(options = {}) {
           if (m.type === "status") {
             peer.lastSeen = Date.now();
             peer.imageId = store.image(m.id) ? m.id : null;
+            peer.outputMode = ["image", "black", "clear"].includes(m.outputMode)
+              ? m.outputMode
+              : null;
             peer.seq = Number.isSafeInteger(m.seq) ? m.seq : -1;
             peer.error =
               typeof m.error === "string" ? m.error.slice(0, 200) : null;

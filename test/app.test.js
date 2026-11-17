@@ -217,3 +217,61 @@ test("2台のACKを待ち、切断時は送出を中止し再接続時に状態�
   assert.equal(state.seq, 0);
   c.close();
 });
+
+test("CLEAR：送出待機を中断・状態を永続化・再接続へ復元しBLACKと区別", async (t) => {
+  const f = await fixture(t);
+  await image(f);
+  const ws = new WebSocket(f.base.replace("http", "ws") + "/ws?role=receiver");
+  const next = messages(ws);
+  await next("state");
+  const take = f.api("command", { action: "take" });
+  const prepare = await next("prepare");
+  assert.equal((await f.api("command", { action: "clear" })).status, 200);
+  assert.equal((await take).status, 409);
+  const clear = await next("program");
+  assert.equal(clear.id, null);
+  assert.equal(clear.outputMode, "clear");
+  assert.equal(clear.seq, 1);
+  ws.send(
+    JSON.stringify({
+      type: "ack",
+      id: prepare.id,
+      token: prepare.token,
+      ok: true,
+    }),
+  );
+  assert.equal(f.store.state.outputMode, "clear");
+  const restored = createApp({ dir: f.dir, password: "test-password" });
+  assert.equal(restored.store.state.outputMode, "clear");
+  assert.equal(restored.store.state.program, null);
+  restored.wss.close();
+  const receiver = new WebSocket(
+    f.base.replace("http", "ws") + "/ws?role=receiver",
+  );
+  const restoredMessages = messages(receiver);
+  assert.equal((await restoredMessages("state")).outputMode, "clear");
+  assert.equal((await f.api("command", { action: "black" })).status, 200);
+  assert.equal((await next("program")).outputMode, "black");
+  assert.equal((await f.api("command", { action: "clear" })).status, 200);
+  const pending = f.api("command", { action: "cut" });
+  const a = await next("prepare"),
+    b = await restoredMessages("prepare");
+  ws.send(JSON.stringify({ type: "ack", id: a.id, token: a.token, ok: true }));
+  receiver.send(
+    JSON.stringify({ type: "ack", id: b.id, token: b.token, ok: true }),
+  );
+  assert.equal((await pending).status, 200);
+  assert.equal(f.store.state.outputMode, "image");
+  ws.close();
+  receiver.close();
+});
+
+test("旧状態ファイルのnull PROGRAMはBLACKとして読み込み互換性を維持", async (t) => {
+  const f = await fixture(t);
+  const legacy = { ...f.store.state };
+  delete legacy.outputMode;
+  fs.writeFileSync(path.join(f.dir, "state.json"), JSON.stringify(legacy));
+  const restored = createApp({ dir: f.dir, password: "test-password" });
+  assert.equal(restored.store.state.outputMode, "black");
+  restored.wss.close();
+});

@@ -7,6 +7,21 @@ const net = require("node:net");
 const assert = require("node:assert/strict");
 const sharp = require("sharp");
 
+async function alphaRange(frame) {
+  // PNG encoders may omit the alpha channel for an opaque BLACK frame.
+  const { data, info } = await sharp(frame)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let min = 255,
+    max = 0;
+  for (let index = 3; index < data.length; index += info.channels) {
+    min = Math.min(min, data[index]);
+    max = Math.max(max, data[index]);
+  }
+  return { min, max };
+}
+
 async function main() {
   const [platform, arch] = process.argv.slice(2);
   const executable =
@@ -111,6 +126,38 @@ async function main() {
       Math.abs(alpha[3] - 128) <= 1,
       `Packaged transparent OUT alpha was ${alpha[3]}`,
     );
+    await page.locator('[data-command="clear"]').click();
+    await output.waitForFunction(
+      () =>
+        !document.querySelector("#output img") &&
+        getComputedStyle(document.querySelector("#output")).backgroundColor ===
+          "rgba(0, 0, 0, 0)",
+    );
+    const cleared = await output.screenshot({ omitBackground: true });
+    const clearAlpha = await alphaRange(cleared);
+    assert.equal(clearAlpha.min, 0);
+    assert.equal(clearAlpha.max, 0);
+    assert.equal(
+      await page.locator("#programName").textContent(),
+      "CLEAR（透明）",
+    );
+    await output.reload();
+    await output.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#output")).backgroundColor ===
+        "rgba(0, 0, 0, 0)",
+    );
+    await page.locator('[data-command="black"]').click();
+    await output.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#output")).backgroundColor ===
+        "rgb(0, 0, 0)",
+    );
+    const blackAlpha = await alphaRange(
+      await output.screenshot({ omitBackground: true }),
+    );
+    assert.equal(blackAlpha.min, 255);
+    assert.equal(blackAlpha.max, 255);
     // Confirm the build did not accidentally include developer data or tests.
     const archiveRoot = await application.evaluate(({ app }) =>
       app.getAppPath(),
@@ -126,7 +173,7 @@ async function main() {
       );
     }
     console.log(
-      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, isolated data.",
+      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, isolated data.",
     );
   } finally {
     await application.close();

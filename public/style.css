@@ -191,6 +191,8 @@ label {
   overflow-wrap: anywhere;
 }
 .receiver {
+  position: fixed;
+  inset: 0;
   background: #000;
   overflow: hidden;
   cursor: none;
@@ -224,4 +226,16 @@ html.transparent-output body.receiver {
   .controls button {
     min-width: 70px;
   }
+}
+
+/* Checkerboard is an operator monitor aid only, never part of OUT. */
+.screen.clear {
+  background-color: #263140;
+  background-image: conic-gradient(
+    #425064 25%,
+    transparent 0 50%,
+    #425064 0 75%,
+    transparent 0
+  );
+  background-size: 24px 24px;
 }

@@ -4,7 +4,7 @@ const transparentBackground =
 if (transparentBackground)
   document.documentElement.classList.add("transparent-output");
 let session = false,
-  lastStatus = { id: null, seq: -1, error: null };
+  lastStatus = { id: null, outputMode: "black", seq: -1, error: null };
 const player = new Player(
   document.querySelector("#output"),
   (status) => {
@@ -23,6 +23,7 @@ const connection = connect(
         player.seq = -1;
         await player.show({
           id: message.program,
+          outputMode: message.outputMode,
           seq: message.seq,
           transition: "cut",
           duration: 0,

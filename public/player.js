@@ -11,6 +11,8 @@ export class Player {
     this.cache = new Map();
     this.current = null;
     this.displayId = null;
+    this.displayMode = "black";
+    this.currentMode = "black";
     this.transparentBackground = transparentBackground;
     this.settings = { fit: "contain", background: "#000000" };
   }
@@ -25,7 +27,9 @@ export class Player {
     // must use the incoming image, rather than the last completed image.
     this.container.style.backgroundColor =
       this.displayId === null
-        ? "#000000"
+        ? this.displayMode === "clear"
+          ? "transparent"
+          : "#000000"
         : this.transparentBackground
           ? "transparent"
           : this.settings.background;
@@ -69,12 +73,14 @@ export class Player {
           animation.cancel();
         }
       this.displayId = command.id;
+      this.displayMode = command.outputMode || (command.id ? "image" : "black");
       this.applyBackground();
       const old = [...this.container.children];
       const img = source ? source.cloneNode() : document.createElement("img");
       if (!source) {
         img.removeAttribute("src");
-        img.style.backgroundColor = "#000";
+        img.style.backgroundColor =
+          this.displayMode === "clear" ? "transparent" : "#000";
         img.alt = "";
       }
       img.style.objectFit = this.settings.fit;
@@ -103,10 +109,21 @@ export class Player {
       old.forEach((el) => el.remove());
       if (!source) img.remove();
       this.current = command.id;
-      this.onStatus({ id: command.id, seq: command.seq, error: null });
+      this.currentMode = this.displayMode;
+      this.onStatus({
+        id: command.id,
+        outputMode: this.currentMode,
+        seq: command.seq,
+        error: null,
+      });
     } catch (e) {
       if (generation === this.generation)
-        this.onStatus({ id: this.current, seq: command.seq, error: e.message });
+        this.onStatus({
+          id: this.current,
+          outputMode: this.currentMode,
+          seq: command.seq,
+          error: e.message,
+        });
     }
   }
 }

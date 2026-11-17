@@ -19,6 +19,8 @@ export class Store {
             take: "fade",
           },
         };
+    // Existing saved states used null for BLACK; retain that behavior.
+    this.state.outputMode ??= this.state.program ? "image" : "black";
   }
   save() {
     fs.writeFileSync(this.file + ".tmp", JSON.stringify(this.state, null, 2));
@@ -33,15 +35,29 @@ export class Store {
       ? a[(a.findIndex((i) => i.id === this.state.preview) + 1) % a.length].id
       : null;
   }
-  take(id, transition, duration) {
+  take(id, transition, duration, outputMode = id === null ? "black" : "image") {
     if (id !== null && !this.image(id)) throw Error("画像が存在しません");
     if (!["cut", "fade"].includes(transition))
       throw Error("トランジションが不正です");
     if (!Number.isInteger(duration) || duration < 0 || duration > 10000)
       throw Error("FADE時間は0〜10000msです");
+    if (
+      id === null
+        ? !["black", "clear"].includes(outputMode)
+        : outputMode !== "image"
+    )
+      throw Error("出力モードが不正です");
+    this.state.outputMode = outputMode;
     this.state.program = id;
     this.state.seq++;
     this.save();
-    return { type: "program", id, seq: this.state.seq, transition, duration };
+    return {
+      type: "program",
+      id,
+      outputMode,
+      seq: this.state.seq,
+      transition,
+      duration,
+    };
   }
 }

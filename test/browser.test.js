@@ -266,6 +266,56 @@ test(
       .raw()
       .toBuffer();
     assert.equal(corner[3], 0);
+    // CLEAR must remove every output pixel, unlike BLACK; restore after reload.
+    await invoke("clear");
+    await transparent.waitForFunction(
+      () =>
+        !document.querySelector("#output img") &&
+        getComputedStyle(document.querySelector("#output")).backgroundColor ===
+          "rgba(0, 0, 0, 0)",
+    );
+    const assertClear = async () => {
+      const frame = await transparent.screenshot({ omitBackground: true });
+      const alpha = (await sharp(frame).ensureAlpha().stats()).channels[3];
+      assert.equal(alpha.min, 0);
+      assert.equal(alpha.max, 0);
+    };
+    await assertClear();
+    assert.deepEqual((await inspect(normal))[0], [0, 0, 0, 255]);
+    await transparent.reload();
+    await transparent.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#output")).backgroundColor ===
+        "rgba(0, 0, 0, 0)",
+    );
+    await assertClear();
+    await invoke("black");
+    await transparent.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("#output")).backgroundColor ===
+        "rgb(0, 0, 0)",
+    );
+    assert.equal((await inspect(transparent))[0][3], 255);
+    await invoke("fade");
+    await invoke("clear");
+    await transparent.waitForFunction(
+      () =>
+        !document.querySelector("#output img") &&
+        getComputedStyle(document.querySelector("#output")).backgroundColor ===
+          "rgba(0, 0, 0, 0)",
+    );
+    // Let the interrupted 150ms fade finish; its callback must not undo CLEAR.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await assertClear();
+    await invoke("cut");
+    await transparent.waitForFunction(
+      () => document.querySelector("#output img")?.complete,
+    );
+    assert.deepEqual(
+      (await inspect(transparent)).map((p) => p[3]),
+      [0, 128, 255],
+    );
+
     assert.deepEqual(errors, []);
   },
 );

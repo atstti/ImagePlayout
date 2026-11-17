@@ -32,7 +32,7 @@ async function api(url, body, method = "POST") {
   return response.status === 204 ? null : response.json();
 }
 async function command(action) {
-  if (busy && action !== "black") return;
+  if (busy && !["black", "clear"].includes(action)) return;
   busy = true;
   try {
     report("");
@@ -54,7 +54,10 @@ function button(label, fn) {
 function render() {
   const image = (id) => state.images.find((i) => i.id === id);
   $("previewName").textContent = image(state.preview)?.name || "未選択";
-  $("programName").textContent = image(state.program)?.name || "BLACK";
+  $("programName").textContent =
+    image(state.program)?.name ||
+    (state.outputMode === "clear" ? "CLEAR（透明）" : "BLACK");
+  $("program").classList.toggle("clear", state.outputMode === "clear");
   $("imageCount").textContent = state.images.length + "枚";
   $("receiverCount").textContent =
     state.receivers.filter((p) => p.connected).length + "台";
@@ -121,7 +124,7 @@ function render() {
   for (const p of state.receivers) {
     const row = document.createElement("div");
     row.className = "peer";
-    row.textContent = `${p.connected ? "● 接続中" : "○ 切断"} ${p.address} / ${p.id.slice(0, 8)} ｜ 最終応答 ${new Date(p.lastSeen).toLocaleTimeString("ja-JP")} ｜ 画像ID ${p.imageId || "BLACK"} ｜ SEQ ${p.seq}${p.error ? " ｜ エラー: " + p.error : ""}`;
+    row.textContent = `${p.connected ? "● 接続中" : "○ 切断"} ${p.address} / ${p.id.slice(0, 8)} ｜ 最終応答 ${new Date(p.lastSeen).toLocaleTimeString("ja-JP")} ｜ 画像ID ${p.imageId || (p.outputMode === "clear" ? "CLEAR（透明）" : p.outputMode === "black" ? "BLACK" : "未確認")} ｜ SEQ ${p.seq}${p.error ? " ｜ エラー: " + p.error : ""}`;
     $("receivers").append(row);
   }
 }
@@ -133,6 +136,7 @@ connect(
       render();
       program.show({
         id: state.program,
+        outputMode: state.outputMode,
         seq: state.seq,
         transition: "cut",
         duration: 0,
