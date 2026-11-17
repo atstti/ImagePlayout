@@ -275,3 +275,17 @@ test("旧状態ファイルのnull PROGRAMはBLACKとして読み込み互換性
   assert.equal(restored.store.state.outputMode, "black");
   restored.wss.close();
 });
+
+test("透過OUTコピー用URL APIは認証を要求し、資格情報を含まないURLを返す", async (t) => {
+  const f = await fixture(t);
+  assert.equal((await fetch(f.base + "/api/output-url")).status, 401);
+  const response = await f.api("output-url", undefined, "GET");
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const url = new URL((await response.json()).url);
+  assert.equal(url.pathname, "/receiver");
+  assert.equal(url.searchParams.get("transparent"), "1");
+  assert.equal(url.port, new URL(f.base).port);
+  assert.equal(url.username, "");
+  assert.equal(url.password, "");
+});

@@ -26,6 +26,7 @@ test(
     });
     const admin = await browser.newContext({
         httpCredentials: { username: "admin", password: "browser-test" },
+        permissions: ["clipboard-read", "clipboard-write"],
       }),
       receiver = await browser.newContext();
     const page = await admin.newPage(),
@@ -35,6 +36,76 @@ test(
     for (const p of [page, output, other])
       p.on("pageerror", (e) => errors.push(e.message));
     await page.goto(base);
+    await page.waitForFunction(
+      () => !document.querySelector("#copyOutputUrl").disabled,
+    );
+    assert.equal(await page.locator("header a").count(), 0);
+    assert.equal(await page.locator("header button").count(), 1);
+    const urlResponse = await fetch(base + "/api/output-url", {
+      headers: {
+        Authorization:
+          "Basic " + Buffer.from("admin:browser-test").toString("base64"),
+      },
+    });
+    const expectedUrl = (await urlResponse.json()).url;
+    const beforePages = admin.pages().length;
+    await page.locator("#copyOutputUrl").click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#copyStatus").textContent === "コピーしました",
+    );
+    assert.equal(
+      await page.evaluate(() => navigator.clipboard.readText()),
+      expectedUrl,
+    );
+    assert.equal(admin.pages().length, beforePages);
+    assert.equal(page.url(), base + "/");
+    // LAN HTTP has no Clipboard API. Exercise its actual native copy fallback.
+    await page.evaluate(() => {
+      window.nativeClipboard = navigator.clipboard;
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: undefined,
+      });
+      document.addEventListener("copy", () => {
+        window.fallbackCopyEvent = true;
+      });
+      document.querySelector("#copyStatus").textContent = "";
+    });
+    await page.locator("#copyOutputUrl").click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#copyStatus").textContent === "コピーしました",
+    );
+    assert.equal(await page.evaluate(() => window.fallbackCopyEvent), true);
+    assert.equal(
+      await page.evaluate(() => window.nativeClipboard.readText()),
+      expectedUrl,
+    );
+    // If both browser copy methods fail, show the URL without opening a tab.
+    await page.evaluate(() => {
+      window.nativeCopy = document.execCommand;
+      document.execCommand = () => false;
+    });
+    await page.locator("#copyOutputUrl").click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#copyStatus").textContent ===
+        "コピーできませんでした",
+    );
+    assert.match(
+      await page.locator("#error").textContent(),
+      /receiver\?transparent=1/,
+    );
+    assert.equal(admin.pages().length, beforePages);
+    await page.evaluate(() => {
+      document.execCommand = window.nativeCopy;
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: window.nativeClipboard,
+      });
+      document.querySelector("#error").textContent = "";
+    });
     await output.goto(base + "/receiver");
     await other.goto(base + "/receiver");
     await page.waitForFunction(
@@ -63,11 +134,34 @@ test(
       () => document.querySelectorAll("#output img").length === 1,
     );
     assert.equal(runtime.store.state.program, runtime.store.state.images[0].id);
+    // Operator monitors show checkerboard through alpha, independent of OUT's matte.
+    const monitorPixels = async (id) => {
+      const { data, info } = await sharp(
+        await page.locator("#" + id).screenshot(),
+      )
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      return [6, 18].map((x) =>
+        Array.from(
+          data.subarray((6 * info.width + x) * 4, (6 * info.width + x) * 4 + 4),
+        ),
+      );
+    };
+    const previewPattern = await monitorPixels("preview"),
+      programPattern = await monitorPixels("program");
+    assert.notDeepEqual(previewPattern[0], previewPattern[1]);
+    assert.notDeepEqual(programPattern[0], programPattern[1]);
+    assert.equal(previewPattern[0][3], 255);
+    assert.equal(programPattern[0][3], 255);
+
     await page.locator("#background").fill("#ffffff");
     await page.locator("#saveSettings").click();
     await page.waitForFunction(
       () => document.querySelector("#background").value === "#ffffff",
     );
+    assert.deepEqual(await monitorPixels("preview"), previewPattern);
+    assert.deepEqual(await monitorPixels("program"), programPattern);
     await page.locator('[data-command="fade"]').click();
     await output.waitForFunction(
       () => document.querySelectorAll("#output img").length === 1,
@@ -82,6 +176,14 @@ test(
         getComputedStyle(document.querySelector("#output")).backgroundColor ===
           "rgb(0, 0, 0)",
     );
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#programName").textContent === "BLACK" &&
+        !document
+          .querySelector("#program")
+          .classList.contains("monitor-transparent"),
+    );
+    assert.deepEqual((await monitorPixels("program"))[0], [0, 0, 0, 255]);
     await page.locator('[data-command="cut"]').click();
     await output.waitForFunction(
       () => document.querySelectorAll("#output img").length === 1,

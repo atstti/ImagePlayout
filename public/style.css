@@ -229,7 +229,7 @@ html.transparent-output body.receiver {
 }
 
 /* Checkerboard is an operator monitor aid only, never part of OUT. */
-.screen.clear {
+.screen.monitor-transparent {
   background-color: #263140;
   background-image: conic-gradient(
     #425064 25%,

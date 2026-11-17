@@ -8,17 +8,15 @@
   <body>
     <header>
       <h1>Image Playout <span>LAN</span></h1>
-      <span id="connection">接続中…</span
-      ><a href="/receiver" target="_blank" rel="noopener">受信画面 ↗</a>
-      <a href="/receiver?transparent=1" target="_blank" rel="noopener"
-        >OBS用 透過OUT ↗</a
-      >
+      <span id="connection">接続中…</span>
+      <button id="copyOutputUrl" disabled>透過OUTのURLをコピー</button>
+      <span id="copyStatus" role="status" aria-live="polite"></span>
     </header>
     <main>
       <div class="monitors">
         <section>
           <h2 class="next">PREVIEW <small>NEXT</small></h2>
-          <div id="preview" class="screen"></div>
+          <div id="preview" class="screen monitor-transparent"></div>
           <p id="previewName">未選択</p>
         </section>
         <section>

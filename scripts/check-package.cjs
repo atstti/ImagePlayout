@@ -58,6 +58,24 @@ async function main() {
   try {
     const page = await application.firstWindow();
     page.setDefaultTimeout(30000);
+    await page.waitForFunction(
+      () => !document.querySelector("#copyOutputUrl").disabled,
+    );
+    const windowCount = application.windows().length;
+    await page.locator("#copyOutputUrl").click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#copyStatus").textContent === "コピーしました",
+    );
+    const copiedUrl = new URL(
+      await application.evaluate(({ clipboard }) => clipboard.readText()),
+    );
+    assert.equal(copiedUrl.pathname, "/receiver");
+    assert.equal(copiedUrl.searchParams.get("transparent"), "1");
+    assert.equal(copiedUrl.port, String(port));
+    assert.equal(copiedUrl.username, "");
+    assert.equal(copiedUrl.password, "");
+    assert.equal(application.windows().length, windowCount);
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.waitForSelector("#upload", {
@@ -85,6 +103,26 @@ async function main() {
       await page.locator("#programName").textContent(),
       /配布版テスト/,
     );
+    for (const id of ["preview", "program"]) {
+      const monitor = page.locator("#" + id);
+      const box = await monitor.boundingBox();
+      const { data, info } = await sharp(await monitor.screenshot())
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const pixel = (x) => {
+        const offset =
+          (Math.floor((6 * info.height) / box.height) * info.width +
+            Math.floor((x * info.width) / box.width)) *
+          4;
+        return Array.from(data.subarray(offset, offset + 4));
+      };
+      assert.notDeepEqual(
+        pixel(6),
+        pixel(18),
+        id + " should reveal checkerboard through PNG alpha",
+      );
+    }
     const receiver = await fetch(`http://127.0.0.1:${port}/receiver`);
     assert.equal(receiver.status, 200);
     assert.ok(fs.existsSync(path.join(dir, "data", "admin-password.txt")));
@@ -173,7 +211,7 @@ async function main() {
       );
     }
     console.log(
-      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, isolated data.",
+      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, native clipboard copy, monitor checkerboard, isolated data.",
     );
   } finally {
     await application.close();

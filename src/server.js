@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { Store } from "./store.js";
+import { transparentOutputUrl } from "./network.js";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const config = JSON.parse(fs.readFileSync(path.join(root, "config.json")));
 export function createApp(options = {}) {
@@ -99,6 +100,13 @@ export function createApp(options = {}) {
       .sendFile(path.join(dir, "images", img.id));
   });
   app.use("/api", auth, express.json({ limit: "128kb" }));
+  app.get("/api/output-url", (req, res) => {
+    res
+      .set("Cache-Control", "no-store")
+      .json({
+        url: transparentOutputUrl(`${req.protocol}://${req.get("host")}`),
+      });
+  });
   app.get("/api/state", (req, res) => res.json(status()));
   const upload = multer({
     storage: multer.memoryStorage(),

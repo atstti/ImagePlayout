@@ -1,16 +1,25 @@
 import { Player, connect } from "./player.js";
+import { copyText } from "./clipboard.js";
 const $ = (id) => document.getElementById(id);
 let state;
 let busy = false;
 let settingsDirty = false;
 const report = (error) =>
   ($("error").textContent = error?.message || error || "");
-const preview = new Player($("preview"), (s) => {
-  if (s.error) report(s.error);
-});
-const program = new Player($("program"), (s) => {
-  if (s.error) report(s.error);
-});
+const preview = new Player(
+  $("preview"),
+  (s) => {
+    if (s.error) report(s.error);
+  },
+  { transparentBackground: true },
+);
+const program = new Player(
+  $("program"),
+  (s) => {
+    if (s.error) report(s.error);
+  },
+  { transparentBackground: true },
+);
 let previewSeq = 0,
   lastPreview;
 async function api(url, body, method = "POST") {
@@ -57,7 +66,10 @@ function render() {
   $("programName").textContent =
     image(state.program)?.name ||
     (state.outputMode === "clear" ? "CLEAR（透明）" : "BLACK");
-  $("program").classList.toggle("clear", state.outputMode === "clear");
+  $("program").classList.toggle(
+    "monitor-transparent",
+    Boolean(state.program) || state.outputMode === "clear",
+  );
   $("imageCount").textContent = state.images.length + "枚";
   $("receiverCount").textContent =
     state.receivers.filter((p) => p.connected).length + "台";
@@ -207,3 +219,26 @@ document.addEventListener("keydown", (e) => {
   }
   if (e.key === "ArrowRight") command("next");
 });
+
+// Resolve once before the click, preserving the user gesture for HTTP copy fallback.
+let outputUrl;
+fetch("/api/output-url")
+  .then(async (response) => {
+    if (!response.ok)
+      throw Error(
+        "透過OUTのURLを取得できませんでした。ページを再読み込みしてください",
+      );
+    outputUrl = (await response.json()).url;
+    $("copyOutputUrl").disabled = false;
+  })
+  .catch(report);
+$("copyOutputUrl").onclick = async () => {
+  $("copyStatus").textContent = "";
+  try {
+    await copyText(outputUrl);
+    $("copyStatus").textContent = "コピーしました";
+  } catch (error) {
+    $("copyStatus").textContent = "コピーできませんでした";
+    report(`${error.message}。URL: ${outputUrl}`);
+  }
+};
