@@ -110,7 +110,7 @@ function render() {
   }
   if (!settingsDirty) {
     $("videoAudio").checked = state.settings.videoMuted !== true;
-    $("videoLoop").checked = state.settings.videoLoop !== false;
+    $("videoLoop").checked = state.settings.videoLoop === true;
   }
   const library = $("library");
   const signature = JSON.stringify(state.images);

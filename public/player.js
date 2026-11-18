@@ -31,7 +31,7 @@ export class Player {
     this.settings = {
       fit: "contain",
       background: "#000000",
-      videoLoop: true,
+      videoLoop: false,
       videoMuted: false,
     };
   }
@@ -59,7 +59,7 @@ export class Player {
     }
   }
   configureVideo(video) {
-    video.loop = this.settings.videoLoop !== false;
+    video.loop = this.settings.videoLoop === true;
     video.muted =
       this.pausedPreview ||
       this.forceMuted ||

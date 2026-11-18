@@ -6,6 +6,7 @@ import path from "node:path";
 import { chromium } from "playwright-core";
 import { createApp } from "../src/server.js";
 import { formatTime, formatRemaining } from "../public/time.js";
+import { Store } from "../src/store.js";
 const fixturePath = (name) => new URL("./fixtures/" + name, import.meta.url);
 async function setup(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "playout-video-"));
@@ -34,6 +35,22 @@ async function setup(t) {
   };
   return { ...runtime, dir, base, headers, api, upload };
 }
+
+test("動画ループ：初期OFF・保存済みON/OFFを維持・旧データもOFF", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "playout-loop-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const store = new Store(dir);
+  assert.equal(store.state.settings.videoLoop, false);
+  assert.equal(store.state.settings.videoMuted, false);
+  for (const enabled of [true, false]) {
+    store.state.settings.videoLoop = enabled;
+    store.save();
+    assert.equal(new Store(dir).state.settings.videoLoop, enabled);
+  }
+  delete store.state.settings.videoLoop;
+  store.save();
+  assert.equal(new Store(dir).state.settings.videoLoop, false);
+});
 
 test("動画登録：MP4/WebM・音声/時間メタデータ・Range・偽装拒否・保存復元", async (t) => {
   const f = await setup(t);
@@ -106,6 +123,10 @@ test(
     const page = await admin.newPage();
     await page.goto(f.base);
     page.setDefaultTimeout(15000);
+    await page.waitForFunction(() => document.querySelector("#preview video")?.readyState >= 3);
+    assert.equal(await page.locator("#videoLoop").isChecked(), false);
+    await page.locator("#videoLoop").check();
+    await page.locator("#saveSettings").click();
     const receiver = await browser.newPage();
     await receiver.goto(f.base + "/receiver?transparent=1");
     receiver.setDefaultTimeout(15000);

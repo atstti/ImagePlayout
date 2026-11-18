@@ -21,7 +21,7 @@ export class Store {
         };
     // Existing saved states used null for BLACK; retain that behavior.
     this.state.outputMode ??= this.state.program ? "image" : "black";
-    this.state.settings.videoLoop ??= true;
+    this.state.settings.videoLoop ??= false;
     this.state.settings.videoMuted ??= false;
     this.state.programStartedAt ??= null;
   }
