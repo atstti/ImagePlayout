@@ -273,13 +273,22 @@ test(
     t.after(() => browser.close());
     const page = await browser.newPage();
     page.setDefaultTimeout(15000);
-    // Chromium builds differ in enforcement of the command-line policy flag.
-    // Force the standard NotAllowedError until an actual user gesture occurs,
-    // then delegate to native play() so decoding and audible playback are real.
+    // Automation evaluation can transiently activate a document. Require an
+    // actual trusted click on the permission button, not a timing-dependent
+    // navigator.userActivation check, before delegating to native play().
     await page.addInitScript(() => {
+      let audioAllowed = false;
+      document.addEventListener(
+        "click",
+        (event) => {
+          if (event.isTrusted && event.target.closest("#audioUnlock"))
+            audioAllowed = true;
+        },
+        true,
+      );
       const play = HTMLMediaElement.prototype.play;
       HTMLMediaElement.prototype.play = function () {
-        if (!this.muted && !navigator.userActivation.isActive)
+        if (!this.muted && !audioAllowed)
           return Promise.reject(
             new DOMException(
               "Audio requires a user gesture",
