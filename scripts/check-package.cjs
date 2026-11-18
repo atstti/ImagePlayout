@@ -239,6 +239,13 @@ async function main() {
     assert.equal(blackAlpha.min, 255);
     assert.equal(blackAlpha.max, 255);
     assert.deepEqual(await commandGeometry(), beforeClear);
+    await page.locator('[data-command="preview-clear"]').click();
+    await page.waitForFunction(() => document.querySelector("#previewName").textContent === "CLEAR（透明）");
+    assert.equal(await page.locator("#programName").textContent(), "BLACK");
+    await page.locator('[data-command="take"]').click();
+    await output.waitForFunction(() => !document.querySelector("#output img") && getComputedStyle(document.querySelector("#output")).backgroundColor === "rgba(0, 0, 0, 0)");
+    const preparedClear = await alphaRange(await output.screenshot({ omitBackground: true }));
+    assert.equal(preparedClear.max, 0);
     assert.equal(await page.locator("#videoLoop").isChecked(), false);
     assert.equal(await page.locator("#maxVideoUploadMB").inputValue(), "2048");
     await page.locator("#maxVideoUploadMB").fill("4096");

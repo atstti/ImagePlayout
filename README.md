@@ -1,6 +1,6 @@
 # Image Playout LAN
 
-**アプリとして使う方は [ダウンロードページ（デスクトップ試用版）](https://github.com/atstti/ImagePlayout/releases/tag/v1.2.1) へ。Node.jsのインストールは不要です。** MacはDMG、WindowsはEXEを選んでください。以下の起動手順はソースコードから実行する方向けです。
+**アプリとして使う方は [ダウンロードページ（デスクトップ試用版）](https://github.com/atstti/ImagePlayout/releases/tag/v1.2.2) へ。Node.jsのインストールは不要です。** MacはDMG、WindowsはEXEを選んでください。以下の起動手順はソースコードから実行する方向けです。
 
 操作PCの画像・動画をLAN内の別PCへ送出するNode.jsアプリケーションです。操作画面は日本語のダークテーマ、受信画面は画像のみを表示します。既存コードのない新規プロジェクトとして実装しました。
 
@@ -277,3 +277,9 @@ HTTPのRangeリクエストに対応し、途中位置へのシークにも対�
 動画解析にはMediaInfoLibのWebAssembly版 `mediainfo.js` を同梱します。利用者によるFFmpegなどの別途インストールは不要です。MediaInfoLib Copyright (c) 2002–2023 MediaArea.net SARL、BSD-2-Clause。ライセンスは同梱パッケージの `LICENSE.txt` に含まれます。
 
 動画関連の追加テストは、MP4 / WebMと音声の検証、時間取得、HTTP Range、偽装ファイル拒否、一時ファイルの片付け、状態復元、実ブラウザでの再生・音声ON/OFF・ループ・終了・FADE中断・再生許可を検証します。開発用のテスト動画はFFmpegの生成素材と正弦波から作った4秒のサンプルです。実際の音量・スピーカー出力・OBSの音声ルーティングは利用環境で確認してください。
+
+### PREVIEWにCLEARを準備する
+
+PREVIEW見出しの「CLEARを準備」で、透明画面を次の送出としてセットします。準備だけではPROGRAMは変わりません。「TAKE」で選択中のCUT / FADEを使って透明へ切り替えます。FADE時間は通常の設定を使用し、動画の音声も徐々に下がって停止します。CUT / FADEボタンからも送出できます。
+
+従来の「CLEAR（透明）」は即時クリアです。FADE中でも即座に映像・音声を停止します。「NEXT」または素材の選択でPREVIEWを画像・動画へ戻せます。AUTO NEXTがONの場合、CLEARのTAKE後も次の素材をPREVIEWへセットします。PREVIEWのCLEAR状態も再起動後に復元します。

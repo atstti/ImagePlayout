@@ -289,3 +289,32 @@ test("透過OUTコピー用URL APIは認証を要求し、資格情報を含ま�
   assert.equal(url.username, "");
   assert.equal(url.password, "");
 });
+
+test("PREVIEW CLEAR：準備はPROGRAM不変・TAKEのFADE/CUT・保存復元・NEXT", async (t) => {
+  const f = await fixture(t);
+  assert.equal((await f.api("command", { action: "take" })).status, 400);
+  const img = await image(f);
+  await f.api("command", { action: "cut" });
+  const seq = f.store.state.seq;
+  assert.equal((await f.api("command", { action: "preview-clear" })).status, 200);
+  assert.equal(f.store.state.program, img.id);
+  assert.equal(f.store.state.seq, seq);
+  assert.equal(f.store.state.preview, null);
+  assert.equal(f.store.state.previewMode, "clear");
+  const restored = createApp({ dir: f.dir, password: "test-password" });
+  assert.equal(restored.store.state.previewMode, "clear");
+  restored.wss.close();
+  await image(f); // Registering another file must not replace prepared CLEAR.
+  assert.equal(f.store.state.previewMode, "clear");
+  assert.equal((await f.api("command", { action: "take" })).status, 200);
+  assert.equal(f.store.state.outputMode, "clear");
+  assert.equal(f.store.state.seq, seq + 1);
+  await f.api("command", { action: "next" });
+  assert.equal(f.store.state.previewMode, "image");
+  assert.equal(f.store.state.preview, img.id);
+  await f.api("command", { action: "preview-clear" });
+  await f.api("command", { action: "black" });
+  await f.api("settings", { ...f.store.state.settings, take: "cut" });
+  assert.equal((await f.api("command", { action: "take" })).status, 200);
+  assert.equal(f.store.state.outputMode, "clear");
+});

@@ -79,7 +79,7 @@ function openRename(img) {
 let librarySignature;
 function render() {
   const image = (id) => state.images.find((i) => i.id === id);
-  $("previewName").textContent = image(state.preview)?.name || "未選択";
+  $("previewName").textContent = image(state.preview)?.name || (state.previewMode === "clear" ? "CLEAR（透明）" : "未選択");
   $("programName").textContent =
     image(state.program)?.name ||
     (state.outputMode === "clear" ? "CLEAR（透明）" : "BLACK");
@@ -95,10 +95,12 @@ function render() {
     state.receivers.filter((p) => p.connected).length + "台";
   preview.configure(state.settings);
   program.configure(state.settings);
-  if (lastPreview !== state.preview) {
-    lastPreview = state.preview;
+  const previewKey = `${state.previewMode}:${state.preview}`;
+  if (lastPreview !== previewKey) {
+    lastPreview = previewKey;
     preview.show({
       id: state.preview,
+      outputMode: state.previewMode === "clear" ? "clear" : state.preview ? "image" : "black",
       seq: ++previewSeq,
       transition: "cut",
       duration: 0,
@@ -384,7 +386,7 @@ function updateTiming() {
   $("previewDuration").textContent =
     next?.kind === "video" ? formatTime(next.duration) : "--:--.-";
   $("previewMediaState").textContent =
-    next?.kind === "video" ? "先頭フレーム・無音" : next ? "静止画" : "未選択";
+    next?.kind === "video" ? "先頭フレーム・無音" : next ? "静止画" : state.previewMode === "clear" ? "CLEAR（透明）" : "未選択";
   const playback = program.playbackStatus();
   $("programElapsed").textContent = playback
     ? formatTime(playback.currentTime)

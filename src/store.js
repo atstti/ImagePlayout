@@ -20,6 +20,7 @@ export class Store {
           },
         };
     // Existing saved states used null for BLACK; retain that behavior.
+    this.state.previewMode ??= this.state.preview ? "image" : "empty";
     this.state.outputMode ??= this.state.program ? "image" : "black";
     this.state.settings.maxVideoUploadMB ??= maxVideoUploadMB;
     this.state.settings.videoLoop ??= false;
@@ -35,6 +36,7 @@ export class Store {
   }
   next() {
     const a = this.state.images;
+    this.state.previewMode = a.length ? "image" : "empty";
     this.state.preview = a.length
       ? a[(a.findIndex((i) => i.id === this.state.preview) + 1) % a.length].id
       : null;

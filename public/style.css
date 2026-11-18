@@ -551,3 +551,9 @@ html.transparent-output body.receiver {
 #maxVideoUploadMB {
   width: 100px;
 }
+
+.preview-clear {
+  float: right;
+  font-size: 12px;
+  padding: 3px 8px;
+}

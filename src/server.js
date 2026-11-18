@@ -152,13 +152,18 @@ export function createApp(options = {}) {
       destination = path.join(dir, "images", img.id);
       fs.renameSync(req.file.path, destination);
       const previousPreview = s.preview;
+      const previousPreviewMode = s.previewMode;
       s.images.push(img);
-      if (!s.preview) s.preview = img.id;
+      if (!s.preview && s.previewMode !== "clear") {
+        s.preview = img.id;
+        s.previewMode = "image";
+      }
       try {
         store.save();
       } catch (error) {
         s.images.pop();
         s.preview = previousPreview;
+        s.previewMode = previousPreviewMode;
         fs.rmSync(destination, { force: true });
         throw error;
       }
@@ -192,7 +197,10 @@ export function createApp(options = {}) {
         .json({ error: "送出中または準備中の画像は削除できません" });
     if (!store.image(id)) return res.sendStatus(404);
     s.images = s.images.filter((i) => i.id !== id);
-    if (s.preview === id) s.preview = s.images[0]?.id || null;
+    if (s.preview === id) {
+      s.preview = s.images[0]?.id || null;
+      s.previewMode = s.preview ? "image" : "empty";
+    }
     store.save();
     fs.unlinkSync(path.join(dir, "images", id));
     sync();
@@ -251,9 +259,17 @@ export function createApp(options = {}) {
   app.post("/api/command", async (req, res, next) => {
     try {
       const { action, id } = req.body;
+      if (action === "preview-clear") {
+        s.preview = null;
+        s.previewMode = "clear";
+        store.save();
+        sync();
+        return res.json({ ok: true });
+      }
       if (action === "preview") {
         if (!store.image(id)) throw Error("画像が存在しません");
         s.preview = id;
+        s.previewMode = "image";
         store.save();
         sync();
         return res.json({ ok: true });
@@ -273,6 +289,10 @@ export function createApp(options = {}) {
         throw Error("不明な操作です");
       if (pending)
         return res.status(409).json({ error: "メディアの送出準備中です" });
+      if (s.previewMode === "clear") {
+        commit(null, action === "take" ? s.settings.take : action, s.settings.fadeMs, "clear");
+        return res.json({ ok: true });
+      }
       if (!store.image(s.preview)) throw Error("PREVIEW画像を選択してください");
       const target = s.preview,
         transition = action === "take" ? s.settings.take : action;
