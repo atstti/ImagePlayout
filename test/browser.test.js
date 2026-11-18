@@ -215,7 +215,12 @@ test(
     await output.waitForFunction(
       () => document.querySelectorAll("#output img").length === 1,
     );
-    assert.equal(await output.locator("button, input, select").count(), 0);
+    assert.equal(
+      await output
+        .locator("button:visible, input:visible, select:visible")
+        .count(),
+      0,
+    );
     const seq = await output.evaluate(async () => {
       const { Player } = await import("/assets/player.js");
       const div = document.createElement("div");

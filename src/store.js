@@ -21,6 +21,9 @@ export class Store {
         };
     // Existing saved states used null for BLACK; retain that behavior.
     this.state.outputMode ??= this.state.program ? "image" : "black";
+    this.state.settings.videoLoop ??= true;
+    this.state.settings.videoMuted ??= false;
+    this.state.programStartedAt ??= null;
   }
   save() {
     fs.writeFileSync(this.file + ".tmp", JSON.stringify(this.state, null, 2));
@@ -49,12 +52,15 @@ export class Store {
       throw Error("出力モードが不正です");
     this.state.outputMode = outputMode;
     this.state.program = id;
+    this.state.programStartedAt =
+      this.image(id)?.kind === "video" ? Date.now() : null;
     this.state.seq++;
     this.save();
     return {
       type: "program",
       id,
       outputMode,
+      startedAt: this.state.programStartedAt,
       seq: this.state.seq,
       transition,
       duration,

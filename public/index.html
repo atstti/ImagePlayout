@@ -15,17 +15,17 @@
     <main class="workspace">
       <section class="library-panel" aria-label="画像ライブラリ">
         <div class="libraryHead">
-          <h2>画像ライブラリ <small id="imageCount"></small></h2>
+          <h2>画像・動画ライブラリ <small id="imageCount"></small></h2>
           <label class="upload"
-            >＋ 画像を登録<input
+            >＋ メディア登録<input
               id="upload"
               type="file"
               multiple
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
           /></label>
         </div>
         <p class="hint">
-          画像をクリックしてPREVIEWに設定。ここへドラッグ＆ドロップして登録できます。1画像30MBまで。
+          画像・動画をクリックしてPREVIEWに設定。ドラッグ＆ドロップでも登録できます。画像30MB・動画500MBまで。
         </p>
         <div id="library"></div>
       </section>
@@ -35,11 +35,31 @@
             <h2 class="next">PREVIEW <small>NEXT</small></h2>
             <div id="preview" class="screen monitor-transparent"></div>
             <p id="previewName">未選択</p>
+            <div class="monitor-timing preview-timing">
+              <div>
+                <span class="timing-label">動画の長さ</span
+                ><strong id="previewDuration">--:--.-</strong>
+              </div>
+              <span id="previewMediaState" class="timing-state">静止画</span>
+            </div>
           </section>
           <section>
             <h2 class="air">PROGRAM <small>● ON AIR</small></h2>
             <div id="program" class="screen"></div>
             <p id="programName">BLACK</p>
+            <div class="monitor-timing program-timing">
+              <div class="timing-detail">
+                <span>経過 <b id="programElapsed">--:--.-</b></span
+                ><span>全体 <b id="programDuration">--:--.-</b></span
+                ><span id="programPlaybackState" class="timing-state"
+                  >BLACK</span
+                >
+              </div>
+              <div class="remaining-time">
+                <span id="remainingLabel" class="timing-label">残り時間</span
+                ><strong id="programRemaining">--:--.-</strong>
+              </div>
+            </div>
           </section>
         </div>
         <section class="controls">
@@ -79,6 +99,20 @@
             >背景 <input id="background" type="color" value="#000000" /></label
           ><button id="saveSettings">設定保存</button>
         </section>
+        <section class="video-settings">
+          <label
+            ><input id="videoAudio" type="checkbox" checked /> OUT音声ON</label
+          >
+          <label
+            ><input id="videoLoop" type="checkbox" checked />
+            動画をループ</label
+          >
+          <label
+            ><input id="monitorAudio" type="checkbox" />
+            操作画面で音声を聴く</label
+          >
+          <span class="hint">OUT音声・ループは「設定保存」で反映</span>
+        </section>
         <p id="error" role="alert"></p>
         <section>
           <h2>受信PC <small id="receiverCount">0台</small></h2>
@@ -96,7 +130,7 @@
       aria-labelledby="renameTitle"
     >
       <form id="renameForm">
-        <h2 id="renameTitle">画像の名称変更</h2>
+        <h2 id="renameTitle">メディアの名称変更</h2>
         <label for="renameName">ファイル名</label>
         <input
           id="renameName"

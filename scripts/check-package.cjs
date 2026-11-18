@@ -239,6 +239,77 @@ async function main() {
     assert.equal(blackAlpha.min, 255);
     assert.equal(blackAlpha.max, 255);
     assert.deepEqual(await commandGeometry(), beforeClear);
+    // Upload a real H.264/AAC clip through the packaged WASM validator.
+    await page
+      .locator("#upload")
+      .setInputFiles(path.resolve("test/fixtures/sample.mp4"));
+    await page.waitForFunction(
+      () => document.querySelectorAll(".card").length === 2,
+    );
+    await page.locator(".card").last().locator(".name").click();
+    await page.waitForFunction(
+      () => document.querySelector("#preview video")?.readyState >= 3,
+    );
+    assert.equal(
+      await page.locator("#preview video").evaluate((v) => v.paused && v.muted),
+      true,
+    );
+    assert.equal(
+      await page.locator("#previewDuration").textContent(),
+      "00:04.0",
+    );
+    await page.locator('[data-command="cut"]').click();
+    await output.waitForFunction(
+      () =>
+        document.querySelector("#output video") ||
+        !document.querySelector("#audioUnlock").hidden,
+    );
+    if (await output.locator("#audioUnlock").isVisible())
+      await output.locator("#audioUnlock").click();
+    await output.waitForFunction(
+      () => document.querySelector("#output video")?.currentTime > 0.2,
+    );
+    assert.equal(
+      await output
+        .locator("#output video")
+        .evaluate((v) => !v.paused && !v.muted),
+      true,
+    );
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#programRemaining").textContent !== "--:--.-",
+    );
+    await output.evaluate(() => {
+      window.outgoing = document.querySelector("#output video");
+    });
+    await page
+      .locator("#upload")
+      .setInputFiles(path.resolve("test/fixtures/sample.webm"));
+    await page.waitForFunction(
+      () => document.querySelectorAll(".card").length === 3,
+    );
+    await page.locator(".card").last().locator(".name").click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#previewName").textContent === "sample.webm" &&
+        document.querySelector("#preview video")?.readyState >= 3,
+    );
+    await page.locator('[data-command="fade"]').click();
+    await output.waitForFunction(
+      () =>
+        document.querySelectorAll("#output video").length === 1 &&
+        !document.querySelector("#output video").paused &&
+        window.outgoing !== document.querySelector("#output video"),
+    );
+    assert.equal(await output.evaluate(() => window.outgoing.paused), true);
+    await output.evaluate(() => {
+      window.lastVideo = document.querySelector("#output video");
+    });
+    await page.locator('[data-command="clear"]').click();
+    await output.waitForFunction(
+      () => !document.querySelector("#output video"),
+    );
+    assert.equal(await output.evaluate(() => window.lastVideo.paused), true);
     // Confirm the build did not accidentally include developer data or tests.
     const archiveRoot = await application.evaluate(({ app }) =>
       app.getAppPath(),
@@ -254,7 +325,7 @@ async function main() {
       );
     }
     console.log(
-      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, native clipboard copy, monitor checkerboard, vertical library, separate numbers, stable CLEAR controls, rename dialog, timed copy feedback, isolated data.",
+      "Packaged app OK: automatic login, Japanese image upload, native decoder, CUT, transparent OUT alpha, CLEAR, BLACK, native clipboard copy, monitor checkerboard, vertical library, separate numbers, stable CLEAR controls, rename dialog, timed copy feedback, video/audio/WASM validation, remaining time, isolated data.",
     );
   } finally {
     await application.close();

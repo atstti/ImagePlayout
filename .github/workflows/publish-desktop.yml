@@ -77,6 +77,12 @@ jobs:
           fi
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
           Node.jsのインストール不要で、ダブルクリックすると操作画面が開くデスクトップ試用版です。
+          MP4（H.264 / AAC）・WebM（VP8 / VP9、Opus / Vorbis）の音声付き動画送出に対応しました。
+          PREVIEWに総時間、PROGRAMに経過・総時間・大きな残り時間を表示します。ループ中は「次のループまで」です。
+          初期設定はOUT音声ON・ループON。変更後は設定保存を押してください。操作画面の音声モニターは別にON/OFFできます。
+          音声の自動再生が制限された受信PCでは「音声を有効にして再生」を一度押してください。
+          OBSではブラウザソースの「OBSで音声を制御する」と音声ミキサー設定を確認してください。
+          動画は最大500MB。CLEAR / BLACKでは映像・音声とも停止し、ループOFF時は終了後の最終フレームを保持します。
 
           - Apple Silicon Mac：`mac-arm64.dmg`
           - Intel Mac：`mac-x64.dmg`
@@ -100,7 +106,7 @@ jobs:
           署名・公証は未設定のため、初回にOSの警告が出る場合があります。信頼する入手元であることを確認し、OSや組織のルールに従って許可してください。
           画像・設定はアプリ本体とは別に保存します。開発者の画像やパスワードは含めません。
 
-          GitHub Actionsの各OSで、生成した実アプリの自動認証、日本語画像登録、画像デコード、CUT、透過OUTの実ピクセルのアルファ、CLEARの全画素透過、BLACKとの切り替え、保存先分離、OSクリップボードへのURLコピーを検証済みです。
+          GitHub Actionsの各OSで、生成した実アプリの自動認証、日本語画像登録、画像デコード、CUT、透過OUTの実ピクセルのアルファ、CLEARの全画素透過、BLACKとの切り替え、保存先分離、OSクリップボードへのURLコピー、動画解析・音声ON再生・残り時間・MP4/WebM間のFADEを検証済みです。
           LANでお使いください。インターネットへ直接公開する構成ではありません。
           NOTES
           printf '\n[詳しい使い方](https://github.com/%s/blob/main/docs/%%E9%%85%%8D%%E5%%B8%%83%%E7%%89%%88%%E3%%81%%AE%%E4%%BD%%BF%%E3%%81%%84%%E6%%96%%B9.md)\n\n[ビルド・テスト結果](https://github.com/%s/actions/runs/%s)\n' "$REPOSITORY" "$REPOSITORY" "$RUN_ID" >> "$RUNNER_TEMP/release-notes.md"

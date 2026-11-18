@@ -9,21 +9,32 @@ const player = new Player(
   document.querySelector("#output"),
   (status) => {
     lastStatus = status;
+    if (!status.error) document.querySelector("#audioUnlock").hidden = true;
     connection.send({ type: "status", ...status });
   },
-  { transparentBackground },
+  {
+    transparentBackground,
+    onBlocked: () => {
+      document.querySelector("#audioUnlock").hidden = false;
+    },
+  },
 );
 const connection = connect(
   "receiver",
   async (message, socket) => {
     if (message.type === "state") {
+      player.setMedia(message.images);
+      player.setClock(message.serverTime);
       player.configure(message.settings);
+      if (player.blocked && message.settings.videoMuted)
+        await player.retryBlocked();
       if (!session) {
         session = true;
         player.seq = -1;
         await player.show({
           id: message.program,
           outputMode: message.outputMode,
+          startedAt: message.programStartedAt,
           seq: message.seq,
           transition: "cut",
           duration: 0,
@@ -45,24 +56,45 @@ const connection = connect(
             ok: true,
           }),
         );
-      } catch {
+      } catch (error) {
         socket.send(
           JSON.stringify({
             type: "ack",
             id: message.id,
             token: message.token,
             ok: false,
+            error: error.message,
           }),
         );
       }
     }
-    if (message.type === "program") await player.show(message);
+    if (message.type === "program") {
+      document.querySelector("#audioUnlock").hidden = true;
+      await player.show(message);
+    }
   },
   (connected) => {
     if (!connected) session = false;
   },
 );
-setInterval(() => connection.send({ type: "status", ...lastStatus }), 5000);
+setInterval(
+  () =>
+    connection.send({
+      type: "status",
+      ...lastStatus,
+      playback: player.playbackStatus(),
+    }),
+  5000,
+);
+document.querySelector("#audioUnlock").onclick = async () => {
+  const button = document.querySelector("#audioUnlock");
+  button.disabled = true;
+  try {
+    await player.retryBlocked();
+  } finally {
+    button.disabled = false;
+  }
+};
 async function fullscreen() {
   try {
     if (!document.fullscreenElement)

@@ -2,10 +2,16 @@
   "appId": "jp.imageplayout.lan",
   "productName": "Image Playout LAN",
   "copyright": "Image Playout LAN contributors",
-  "directories": { "output": "dist" },
+  "directories": {
+    "output": "dist"
+  },
   "files": ["desktop/**", "src/**", "public/**", "config.json", "package.json"],
   "asar": true,
-  "asarUnpack": ["node_modules/sharp/**", "node_modules/@img/**"],
+  "asarUnpack": [
+    "node_modules/sharp/**",
+    "node_modules/@img/**",
+    "node_modules/mediainfo.js/dist/MediaInfoModule.wasm"
+  ],
   "npmRebuild": false,
   "artifactName": "ImagePlayoutLAN-${version}-${os}-${arch}.${ext}",
   "mac": {
@@ -16,8 +22,18 @@
       "NSLocalNetworkUsageDescription": "LAN内の受信PCに画像を配信し、表示状態を確認するために使用します。"
     }
   },
-  "dmg": { "sign": false },
-  "win": { "target": ["portable"], "signAndEditExecutable": false },
-  "portable": { "requestExecutionLevel": "user" },
-  "linux": { "target": ["dir"], "category": "AudioVideo" }
+  "dmg": {
+    "sign": false
+  },
+  "win": {
+    "target": ["portable"],
+    "signAndEditExecutable": false
+  },
+  "portable": {
+    "requestExecutionLevel": "user"
+  },
+  "linux": {
+    "target": ["dir"],
+    "category": "AudioVideo"
+  }
 }

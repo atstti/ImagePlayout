@@ -1,5 +1,6 @@
 import { Player, connect } from "./player.js";
 import { copyText } from "./clipboard.js";
+import { formatTime, formatRemaining } from "./time.js";
 const $ = (id) => document.getElementById(id);
 let state;
 let busy = false;
@@ -14,14 +15,14 @@ const preview = new Player(
   (s) => {
     if (s.error) report(s.error);
   },
-  { transparentBackground: true },
+  { transparentBackground: true, paused: true, forceMuted: true },
 );
 const program = new Player(
   $("program"),
   (s) => {
     if (s.error) report(s.error);
   },
-  { transparentBackground: true },
+  { transparentBackground: true, forceMuted: true },
 );
 let previewSeq = 0,
   lastPreview;
@@ -75,6 +76,7 @@ function openRename(img) {
   $("renameName").focus();
   $("renameName").select();
 }
+let librarySignature;
 function render() {
   const image = (id) => state.images.find((i) => i.id === id);
   $("previewName").textContent = image(state.preview)?.name || "未選択";
@@ -85,7 +87,10 @@ function render() {
     "monitor-transparent",
     Boolean(state.program) || state.outputMode === "clear",
   );
-  $("imageCount").textContent = state.images.length + "枚";
+  $("imageCount").textContent = state.images.length + "件";
+  preview.setMedia(state.images);
+  program.setMedia(state.images);
+  program.setClock(state.serverTime);
   $("receiverCount").textContent =
     state.receivers.filter((p) => p.connected).length + "台";
   preview.configure(state.settings);
@@ -103,79 +108,102 @@ function render() {
     if (!settingsDirty && document.activeElement !== $(key))
       $(key).value = state.settings[key];
   }
+  if (!settingsDirty) {
+    $("videoAudio").checked = state.settings.videoMuted !== true;
+    $("videoLoop").checked = state.settings.videoLoop !== false;
+  }
   const library = $("library");
-  const libraryScrollTop = library.scrollTop;
-  library.replaceChildren();
-  state.images.forEach((img, index) => {
-    const card = document.createElement("div");
-    card.className =
-      "card" +
-      (img.id === state.preview ? " selected" : "") +
-      (img.id === state.program ? " live" : "");
-    card.dataset.imageId = img.id;
-    card.tabIndex = 0;
-    card.setAttribute("role", "group");
-    card.setAttribute("aria-label", img.name);
-    const selectImage = () =>
-      api("command", { action: "preview", id: img.id }).catch(report);
-    card.onclick = (event) => {
-      if (event.target.closest("button, input, select, textarea, a")) return;
-      selectImage();
-    };
-    card.onkeydown = (event) => {
-      if (event.target === card && event.key === "Enter") {
-        event.preventDefault();
-        event.stopPropagation();
+  const signature = JSON.stringify(state.images);
+  if (signature !== librarySignature) {
+    librarySignature = signature;
+    for (const video of library.querySelectorAll("video")) {
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    }
+    const libraryScrollTop = library.scrollTop;
+    library.replaceChildren();
+    state.images.forEach((img, index) => {
+      const card = document.createElement("div");
+      card.className =
+        "card" +
+        (img.id === state.preview ? " selected" : "") +
+        (img.id === state.program ? " live" : "");
+      card.dataset.imageId = img.id;
+      card.tabIndex = 0;
+      card.setAttribute("role", "group");
+      card.setAttribute("aria-label", img.name);
+      const selectImage = () =>
+        api("command", { action: "preview", id: img.id }).catch(report);
+      card.onclick = (event) => {
+        if (event.target.closest("button, input, select, textarea, a")) return;
         selectImage();
+      };
+      card.onkeydown = (event) => {
+        if (event.target === card && event.key === "Enter") {
+          event.preventDefault();
+          event.stopPropagation();
+          selectImage();
+        }
+      };
+      const isVideo = img.kind === "video";
+      const thumb = document.createElement(isVideo ? "video" : "img");
+      if (isVideo) {
+        thumb.muted = true;
+        thumb.playsInline = true;
+        thumb.preload = "metadata";
       }
-    };
-    const thumb = document.createElement("img");
-    thumb.src = "/media/" + img.id;
-    thumb.alt = img.name;
-    thumb.className = "thumb";
-    const name = document.createElement("p");
-    name.className = "name";
-    name.title = img.name;
-    name.textContent = img.name;
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.textContent = `${img.width} × ${img.height} · ${(img.size / 1024 / 1024).toFixed(2)} MB`;
-    const move = async (delta) => {
-      const ids = state.images.map((i) => i.id),
-        to = index + delta;
-      if (to < 0 || to >= ids.length) return;
-      [ids[index], ids[to]] = [ids[to], ids[index]];
-      await api("reorder", { ids });
-    };
-    const cardPreview = document.createElement("div");
-    cardPreview.className = "card-preview";
-    const number = document.createElement("span");
-    number.className = "card-number";
-    number.textContent = "No. " + String(index + 1).padStart(2, "0");
-    cardPreview.append(thumb, number);
-    const info = document.createElement("div");
-    info.className = "card-info";
-    info.append(name, meta);
-    const actions = document.createElement("div");
-    actions.className = "card-actions";
-    actions.append(
-      button("↑", () => move(-1)),
-      button("↓", () => move(1)),
-      button("名称変更", () => openRename(img)),
-      button("削除", () => {
-        if (confirm(img.name + " を削除しますか？"))
-          return api("images/" + img.id, undefined, "DELETE");
-      }),
-    );
-    card.append(cardPreview, info, actions);
-    library.append(card);
-  });
-  library.scrollTop = libraryScrollTop;
+      thumb.src = "/media/" + img.id;
+      thumb.alt = img.name;
+      thumb.className = "thumb";
+      const name = document.createElement("p");
+      name.className = "name";
+      name.title = img.name;
+      name.textContent = img.name;
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = `${isVideo ? "VIDEO · " + formatTime(img.duration) + (img.hasAudio ? " · 音声あり · " : " · 音声なし · ") : ""}${img.width} × ${img.height} · ${(img.size / 1024 / 1024).toFixed(2)} MB`;
+      const move = async (delta) => {
+        const ids = state.images.map((i) => i.id),
+          to = index + delta;
+        if (to < 0 || to >= ids.length) return;
+        [ids[index], ids[to]] = [ids[to], ids[index]];
+        await api("reorder", { ids });
+      };
+      const cardPreview = document.createElement("div");
+      cardPreview.className = "card-preview";
+      const number = document.createElement("span");
+      number.className = "card-number";
+      number.textContent = "No. " + String(index + 1).padStart(2, "0");
+      cardPreview.append(thumb, number);
+      const info = document.createElement("div");
+      info.className = "card-info";
+      info.append(name, meta);
+      const actions = document.createElement("div");
+      actions.className = "card-actions";
+      actions.append(
+        button("↑", () => move(-1)),
+        button("↓", () => move(1)),
+        button("名称変更", () => openRename(img)),
+        button("削除", () => {
+          if (confirm(img.name + " を削除しますか？"))
+            return api("images/" + img.id, undefined, "DELETE");
+        }),
+      );
+      card.append(cardPreview, info, actions);
+      library.append(card);
+    });
+    library.scrollTop = libraryScrollTop;
+  }
+  for (const card of library.children) {
+    card.classList.toggle("selected", card.dataset.imageId === state.preview);
+    card.classList.toggle("live", card.dataset.imageId === state.program);
+  }
   $("receivers").replaceChildren();
   for (const p of state.receivers) {
     const row = document.createElement("div");
     row.className = "peer";
-    row.textContent = `${p.connected ? "● 接続中" : "○ 切断"} ${p.address} / ${p.id.slice(0, 8)} ｜ 最終応答 ${new Date(p.lastSeen).toLocaleTimeString("ja-JP")} ｜ 画像ID ${p.imageId || (p.outputMode === "clear" ? "CLEAR（透明）" : p.outputMode === "black" ? "BLACK" : "未確認")} ｜ SEQ ${p.seq}${p.error ? " ｜ エラー: " + p.error : ""}`;
+    row.textContent = `${p.connected ? "● 接続中" : "○ 切断"} ${p.address} / ${p.id.slice(0, 8)} ｜ 最終応答 ${new Date(p.lastSeen).toLocaleTimeString("ja-JP")} ｜ 画像ID ${p.imageId || (p.outputMode === "clear" ? "CLEAR（透明）" : p.outputMode === "black" ? "BLACK" : "未確認")} ｜ SEQ ${p.seq}${p.playback ? " ｜ 動画 " + formatTime(p.playback.currentTime) + " / " + formatTime(p.playback.duration) + " 残り " + formatRemaining(p.playback.duration, p.playback.currentTime) + (p.playback.muted ? "（無音）" : "（音声ON）") : ""}${p.error ? " ｜ エラー: " + p.error : ""}`;
     $("receivers").append(row);
   }
 }
@@ -188,6 +216,7 @@ connect(
       program.show({
         id: state.program,
         outputMode: state.outputMode,
+        startedAt: state.programStartedAt,
         seq: state.seq,
         transition: "cut",
         duration: 0,
@@ -206,7 +235,14 @@ connect(
 document
   .querySelectorAll("[data-command]")
   .forEach((b) => (b.onclick = () => command(b.dataset.command)));
-for (const key of ["fit", "background", "fadeMs", "take"]) {
+for (const key of [
+  "fit",
+  "background",
+  "fadeMs",
+  "take",
+  "videoAudio",
+  "videoLoop",
+]) {
   $(key).addEventListener("input", () => {
     settingsDirty = true;
   });
@@ -217,6 +253,8 @@ $("saveSettings").onclick = () =>
     background: $("background").value,
     fadeMs: Number($("fadeMs").value),
     take: $("take").value,
+    videoLoop: $("videoLoop").checked,
+    videoMuted: !$("videoAudio").checked,
   })
     .then(() => {
       settingsDirty = false;
@@ -329,3 +367,49 @@ $("copyOutputUrl").onclick = async () => {
     report(`${error.message}。URL: ${outputUrl}`);
   }
 };
+
+$("monitorAudio").onchange = () => {
+  program.forceMuted = !$("monitorAudio").checked;
+  if (state) program.configure(state.settings);
+  if (program.active?.tagName === "VIDEO" && !program.active.ended)
+    program.active.play().catch(report);
+};
+function updateTiming() {
+  if (!state) return;
+  const next = state.images.find((item) => item.id === state.preview);
+  $("previewDuration").textContent =
+    next?.kind === "video" ? formatTime(next.duration) : "--:--.-";
+  $("previewMediaState").textContent =
+    next?.kind === "video" ? "先頭フレーム・無音" : next ? "静止画" : "未選択";
+  const playback = program.playbackStatus();
+  $("programElapsed").textContent = playback
+    ? formatTime(playback.currentTime)
+    : "--:--.-";
+  $("programDuration").textContent = playback
+    ? formatTime(playback.duration)
+    : "--:--.-";
+  $("programRemaining").textContent = playback
+    ? formatRemaining(playback.duration, playback.currentTime)
+    : "--:--.-";
+  $("remainingLabel").textContent = playback?.loop
+    ? "次のループまで"
+    : "残り時間";
+  $("programPlaybackState").textContent = playback
+    ? playback.ended
+      ? "再生完了"
+      : playback.paused
+        ? "停止中"
+        : playback.loop
+          ? "ループ再生中"
+          : "再生中"
+    : state.outputMode === "clear"
+      ? "CLEAR"
+      : state.program
+        ? "静止画"
+        : "BLACK";
+  const failed = state.receivers.find((peer) => peer.connected && peer.error);
+  $("programPlaybackState").classList.toggle("playback-warning", !!failed);
+  $("programPlaybackState").title = failed?.error || "";
+  if (failed) $("programPlaybackState").textContent = "OUT要確認";
+}
+setInterval(updateTiming, 100);

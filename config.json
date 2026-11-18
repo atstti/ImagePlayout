@@ -4,5 +4,7 @@
   "maxUploadMB": 30,
   "maxPixels": 50000000,
   "fadeMs": 500,
-  "preloadTimeoutMs": 8000
+  "preloadTimeoutMs": 8000,
+  "maxVideoUploadMB": 500,
+  "videoPreloadTimeoutMs": 20000
 }

@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import sharp from "sharp";
+import { inspectMedia } from "./media.js";
 import { WebSocketServer, WebSocket } from "ws";
 import http from "node:http";
 import fs from "node:fs";
@@ -10,11 +10,24 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { Store } from "./store.js";
 import { transparentOutputUrl } from "./network.js";
 const root = fileURLToPath(new URL("../", import.meta.url));
-const config = JSON.parse(fs.readFileSync(path.join(root, "config.json")));
+const config = {
+  maxVideoUploadMB: 500,
+  videoPreloadTimeoutMs: 20000,
+  ...JSON.parse(fs.readFileSync(path.join(root, "config.json"))),
+};
 export function createApp(options = {}) {
   const dir = options.dir || process.env.DATA_DIR || path.join(root, "data");
   const store = new Store(dir, config.fadeMs);
   const s = store.state;
+  const tempDir = path.join(dir, "uploads");
+  fs.mkdirSync(tempDir, { recursive: true });
+  for (const file of fs.readdirSync(tempDir)) {
+    if (
+      /^[0-9a-f-]{36}$/.test(file) &&
+      Date.now() - fs.statSync(path.join(tempDir, file)).mtimeMs > 86400000
+    )
+      fs.rmSync(path.join(tempDir, file), { force: true });
+  }
   const secretFile = path.join(dir, "admin-password.txt");
   if (!fs.existsSync(secretFile))
     fs.writeFileSync(secretFile, randomBytes(18).toString("base64url"), {
@@ -79,6 +92,7 @@ export function createApp(options = {}) {
     type: "state",
     ...s,
     receivers: [...receivers(), ...disconnected],
+    serverTime: Date.now(),
   });
   const sync = () => broadcast(status());
   app.get("/", auth, (req, res) =>
@@ -101,57 +115,55 @@ export function createApp(options = {}) {
   });
   app.use("/api", auth, express.json({ limit: "128kb" }));
   app.get("/api/output-url", (req, res) => {
-    res
-      .set("Cache-Control", "no-store")
-      .json({
-        url: transparentOutputUrl(`${req.protocol}://${req.get("host")}`),
-      });
+    res.set("Cache-Control", "no-store").json({
+      url: transparentOutputUrl(`${req.protocol}://${req.get("host")}`),
+    });
   });
   app.get("/api/state", (req, res) => res.json(status()));
   const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: config.maxUploadMB * 1024 * 1024, files: 1, fields: 0 },
+    storage: multer.diskStorage({
+      destination: tempDir,
+      filename: (req, file, callback) => callback(null, randomUUID()),
+    }),
+    limits: {
+      fileSize:
+        Math.max(config.maxUploadMB, config.maxVideoUploadMB) * 1024 * 1024,
+      files: 1,
+      fields: 0,
+    },
   });
   app.post("/api/images", upload.single("image"), async (req, res, next) => {
+    let destination;
     try {
-      if (!req.file) throw Error("画像ファイルを指定してください");
-      const metadata = await sharp(req.file.buffer, {
-        limitInputPixels: config.maxPixels,
-        animated: true,
-      }).metadata();
-      const formats = {
-        jpeg: "image/jpeg",
-        png: "image/png",
-        webp: "image/webp",
-        gif: "image/gif",
-      };
-      if (!formats[metadata.format])
-        throw Error("JPEG / PNG / WebP / GIFのみ登録できます");
-      // Decode all frames before storing: reject corrupt and oversized animations.
-      await sharp(req.file.buffer, {
-        limitInputPixels: config.maxPixels,
-        animated: true,
-      }).stats();
+      if (!req.file) throw Error("画像または動画ファイルを指定してください");
+      const metadata = await inspectMedia(req.file, config);
       const img = {
         id: randomUUID(),
         name: Buffer.from(req.file.originalname, "latin1")
           .toString("utf8")
           .slice(0, 200),
         size: req.file.size,
-        width: metadata.width,
-        height: metadata.pageHeight || metadata.height,
-        mime: formats[metadata.format],
+        ...metadata,
       };
-      fs.writeFileSync(path.join(dir, "images", img.id), req.file.buffer, {
-        flag: "wx",
-      });
+      destination = path.join(dir, "images", img.id);
+      fs.renameSync(req.file.path, destination);
+      const previousPreview = s.preview;
       s.images.push(img);
       if (!s.preview) s.preview = img.id;
-      store.save();
+      try {
+        store.save();
+      } catch (error) {
+        s.images.pop();
+        s.preview = previousPreview;
+        fs.rmSync(destination, { force: true });
+        throw error;
+      }
       sync();
       res.status(201).json(img);
-    } catch (e) {
-      next(e);
+    } catch (error) {
+      next(error);
+    } finally {
+      if (req.file) fs.rmSync(req.file.path, { force: true });
     }
   });
   app.patch("/api/images/:id", (req, res, next) => {
@@ -203,16 +215,20 @@ export function createApp(options = {}) {
   app.post("/api/settings", (req, res, next) => {
     try {
       const { fit, background, fadeMs, take } = req.body;
+      const videoLoop = req.body.videoLoop ?? s.settings.videoLoop;
+      const videoMuted = req.body.videoMuted ?? s.settings.videoMuted;
       if (
         !["contain", "cover", "fill"].includes(fit) ||
         !/^#[0-9a-f]{6}$/i.test(background) ||
         !Number.isInteger(fadeMs) ||
         fadeMs < 0 ||
         fadeMs > 10000 ||
-        !["cut", "fade"].includes(take)
+        !["cut", "fade"].includes(take) ||
+        typeof videoLoop !== "boolean" ||
+        typeof videoMuted !== "boolean"
       )
         throw Error("表示設定が不正です");
-      s.settings = { fit, background, fadeMs, take };
+      s.settings = { fit, background, fadeMs, take, videoLoop, videoMuted };
       store.save();
       sync();
       res.json({ ok: true });
@@ -249,7 +265,7 @@ export function createApp(options = {}) {
       if (!["cut", "fade", "take"].includes(action))
         throw Error("不明な操作です");
       if (pending)
-        return res.status(409).json({ error: "画像の送出準備中です" });
+        return res.status(409).json({ error: "メディアの送出準備中です" });
       if (!store.image(s.preview)) throw Error("PREVIEW画像を選択してください");
       const target = s.preview,
         transition = action === "take" ? s.settings.take : action;
@@ -272,7 +288,9 @@ export function createApp(options = {}) {
         if (!waiting.size) return pending.finish(true);
         timer = setTimeout(
           () => pending?.finish(false),
-          config.preloadTimeoutMs,
+          store.image(target)?.kind === "video"
+            ? config.videoPreloadTimeoutMs
+            : config.preloadTimeoutMs,
         );
         for (const ws of waiting)
           send(ws, { type: "prepare", id: target, token });
@@ -280,7 +298,7 @@ export function createApp(options = {}) {
       if (!ready)
         return res.status(409).json({
           error:
-            "受信PCの読み込みACKを確認できません。接続状態を確認してください",
+            "受信PCの読み込みACKを確認できません。動画形式・再生許可・接続状態を確認してください",
         });
       commit(target, transition, s.settings.fadeMs);
       res.json({ ok: true });
@@ -292,7 +310,7 @@ export function createApp(options = {}) {
     res.status(400).json({
       error:
         err.code === "LIMIT_FILE_SIZE"
-          ? `画像は${config.maxUploadMB}MB以下にしてください`
+          ? `画像は${config.maxUploadMB}MB、動画は${config.maxVideoUploadMB}MB以下にしてください`
           : err.message || "処理に失敗しました",
     }),
   );
@@ -340,7 +358,10 @@ export function createApp(options = {}) {
             pending.waiting.has(ws)
           ) {
             if (!m.ok) {
-              peer.error = "画像読み込み失敗";
+              peer.error =
+                typeof m.error === "string"
+                  ? m.error.slice(0, 200)
+                  : "メディア読み込み失敗";
               pending.finish(false);
             } else {
               pending.waiting.delete(ws);
@@ -353,6 +374,22 @@ export function createApp(options = {}) {
             peer.outputMode = ["image", "black", "clear"].includes(m.outputMode)
               ? m.outputMode
               : null;
+            if (
+              m.playback &&
+              Number.isFinite(m.playback.currentTime) &&
+              Number.isFinite(m.playback.duration)
+            ) {
+              peer.playback = {
+                currentTime: Math.min(
+                  86400,
+                  Math.max(0, m.playback.currentTime),
+                ),
+                duration: Math.min(86400, Math.max(0, m.playback.duration)),
+                paused: !!m.playback.paused,
+                ended: !!m.playback.ended,
+                muted: !!m.playback.muted,
+              };
+            } else peer.playback = null;
             peer.seq = Number.isSafeInteger(m.seq) ? m.seq : -1;
             peer.error =
               typeof m.error === "string" ? m.error.slice(0, 200) : null;
