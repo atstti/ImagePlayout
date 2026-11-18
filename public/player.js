@@ -241,7 +241,9 @@ export class Player {
         source.playoutStopped = false;
         const duration = source.duration;
         let position = 0;
-        if (
+        if (command.paused && Number.isFinite(command.position)) {
+          position = Math.min(command.position, Math.max(0, duration - 0.001));
+        } else if (
           !this.pausedPreview &&
           Number.isFinite(command.startedAt) &&
           Number.isFinite(duration) &&
@@ -257,7 +259,7 @@ export class Player {
         }
         source.currentTime = position;
         source.volume = 1;
-        if (this.pausedPreview) this.stop(source);
+        if (this.pausedPreview || command.paused) this.stop(source);
         else {
           let timer;
           try {

@@ -557,3 +557,9 @@ html.transparent-output body.receiver {
   font-size: 12px;
   padding: 3px 8px;
 }
+
+.video-transport { min-height: 112px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.video-transport button { min-width: 64px; padding: 5px 8px; }
+.video-transport label { display: flex; align-items: center; gap: 8px; }
+.video-transport input[type="range"] { flex: 1; min-width: 40px; }
+.video-transport small { color: var(--muted, #aaa); }

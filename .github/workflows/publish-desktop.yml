@@ -77,6 +77,8 @@ jobs:
           fi
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
           Node.jsのインストール不要で、ダブルクリックすると操作画面が開くデスクトップ試用版です。
+          PREVIEWに動画の再生／一時停止、10秒戻る／進む、先頭、シークバーを追加しました。無音の確認用で、TAKEは先頭からです。
+          PROGRAMの一時停止／再開は全OUTの映像・音声と同期し、停止位置を再接続後も復元します。
           PREVIEWの「CLEARを準備」で透明画面を準備し、TAKEのCUT / FADEで送出できるようになりました。動画の音声もフェードアウトします。既存のCLEARは即時クリアです。
           MP4（H.264 / AAC）・WebM（VP8 / VP9、Opus / Vorbis）の音声付き動画送出に対応しました。
           PREVIEWに総時間、PROGRAMに経過・総時間・大きな残り時間を表示します。ループ中は「次のループまで」です。

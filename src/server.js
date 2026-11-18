@@ -259,6 +259,12 @@ export function createApp(options = {}) {
   app.post("/api/command", async (req, res, next) => {
     try {
       const { action, id } = req.body;
+      if (["pause", "resume"].includes(action)) {
+        if (pending) return res.status(409).json({ error: "メディアの送出準備中です" });
+        broadcast(store.playback(action));
+        sync();
+        return res.json({ ok: true });
+      }
       if (action === "preview-clear") {
         s.preview = null;
         s.previewMode = "clear";

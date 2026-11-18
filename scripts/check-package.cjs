@@ -276,6 +276,14 @@ async function main() {
       await page.locator("#previewDuration").textContent(),
       "00:04.0",
     );
+    await page.locator("#previewPlay").click();
+    await page.waitForFunction(() => document.querySelector("#preview video").currentTime > 0.1);
+    await page.locator("#previewPlay").click();
+    assert.equal(await page.locator("#preview video").evaluate(v => v.paused), true);
+    await page.locator("#previewForward").click();
+    await page.waitForFunction(() => document.querySelector("#preview video").currentTime > 3.9);
+    await page.locator("#previewStart").click();
+    await page.waitForFunction(() => document.querySelector("#preview video").currentTime === 0);
     await page.locator('[data-command="cut"]').click();
     await output.waitForFunction(
       () =>
@@ -297,6 +305,13 @@ async function main() {
       () =>
         document.querySelector("#programRemaining").textContent !== "--:--.-",
     );
+    await page.locator("#programPause").click();
+    await output.waitForFunction(() => document.querySelector("#output video")?.paused);
+    const pausePosition = await output.locator("video").evaluate(v => v.currentTime);
+    await output.waitForTimeout(200);
+    assert.equal(await output.locator("video").evaluate(v => v.currentTime), pausePosition);
+    await page.locator("#programResume").click();
+    await output.waitForFunction(() => !document.querySelector("#output video").paused);
     await output.evaluate(() => {
       window.outgoing = document.querySelector("#output video");
     });

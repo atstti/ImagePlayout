@@ -35,6 +35,8 @@ const connection = connect(
           id: message.program,
           outputMode: message.outputMode,
           startedAt: message.programStartedAt,
+        paused: message.programPaused,
+        position: message.programPosition,
           seq: message.seq,
           transition: "cut",
           duration: 0,

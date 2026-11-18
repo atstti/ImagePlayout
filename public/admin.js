@@ -221,6 +221,8 @@ connect(
         id: state.program,
         outputMode: state.outputMode,
         startedAt: state.programStartedAt,
+        paused: state.programPaused,
+        position: state.programPosition,
         seq: state.seq,
         transition: "cut",
         duration: 0,
@@ -377,16 +379,47 @@ $("copyOutputUrl").onclick = async () => {
 $("monitorAudio").onchange = () => {
   program.forceMuted = !$("monitorAudio").checked;
   if (state) program.configure(state.settings);
-  if (program.active?.tagName === "VIDEO" && !program.active.ended)
+  if (program.active?.tagName === "VIDEO" && !program.active.ended && !state?.programPaused)
     program.active.play().catch(report);
 };
+// Preview transport only affects the local confidence player, never PROGRAM.
+function previewVideo() { return preview.active?.tagName === "VIDEO" ? preview.active : null; }
+$("previewPlay").onclick = () => {
+  const video = previewVideo();
+  if (!video) return;
+  if (video.paused) {
+    if (video.ended) video.currentTime = 0;
+    video.play().catch(report);
+  } else video.pause();
+};
+function seekPreview(position) {
+  const video = previewVideo();
+  if (video && Number.isFinite(video.duration))
+    video.currentTime = Math.max(0, Math.min(position, video.duration));
+}
+$("previewSeek").oninput = () => seekPreview(Number($("previewSeek").value));
+$("previewBack").onclick = () => seekPreview((previewVideo()?.currentTime || 0) - 10);
+$("previewForward").onclick = () => seekPreview((previewVideo()?.currentTime || 0) + 10);
+$("previewStart").onclick = () => seekPreview(0);
+$("programPause").onclick = () => command("pause");
+$("programResume").onclick = () => command("resume");
 function updateTiming() {
   if (!state) return;
+  const video = previewVideo();
+  for (const key of ["previewPlay", "previewBack", "previewForward", "previewStart", "previewSeek"])
+    $(key).disabled = !video;
+  $("previewPlay").textContent = video && !video.paused ? "一時停止" : "再生";
+  $("previewSeek").max = video && Number.isFinite(video.duration) ? video.duration : 0;
+  if (document.activeElement !== $("previewSeek")) $("previewSeek").value = video?.currentTime || 0;
+  $("previewPosition").textContent = video ? `${formatTime(video.currentTime)} / ${formatTime(video.duration)}` : "--:--.- / --:--.-";
+  const liveVideo = state.images.find(item => item.id === state.program)?.kind === "video";
+  $("programPause").disabled = !liveVideo || state.programPaused;
+  $("programResume").disabled = !liveVideo || !state.programPaused;
   const next = state.images.find((item) => item.id === state.preview);
   $("previewDuration").textContent =
     next?.kind === "video" ? formatTime(next.duration) : "--:--.-";
   $("previewMediaState").textContent =
-    next?.kind === "video" ? "先頭フレーム・無音" : next ? "静止画" : state.previewMode === "clear" ? "CLEAR（透明）" : "未選択";
+    next?.kind === "video" ? (video && !video.paused ? "確認再生中・無音" : "一時停止・無音") : next ? "静止画" : state.previewMode === "clear" ? "CLEAR（透明）" : "未選択";
   const playback = program.playbackStatus();
   $("programElapsed").textContent = playback
     ? formatTime(playback.currentTime)
@@ -404,7 +437,7 @@ function updateTiming() {
     ? playback.ended
       ? "再生完了"
       : playback.paused
-        ? "停止中"
+        ? (state.programPaused ? "一時停止中" : "停止中")
         : playback.loop
           ? "ループ再生中"
           : "再生中"

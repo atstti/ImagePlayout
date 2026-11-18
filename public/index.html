@@ -42,6 +42,11 @@
               </div>
               <span id="previewMediaState" class="timing-state">静止画</span>
             </div>
+            <div class="video-transport" aria-label="PREVIEW動画操作">
+              <div><button id="previewBack" disabled title="10秒戻る">−10秒</button><button id="previewPlay" disabled>再生</button><button id="previewForward" disabled title="10秒進む">＋10秒</button><button id="previewStart" disabled>先頭</button></div>
+              <label>確認位置 <input id="previewSeek" type="range" min="0" max="0" step="0.1" value="0" disabled /></label>
+              <span id="previewPosition">--:--.- / --:--.-</span><small>確認用・無音。TAKEは先頭から</small>
+            </div>
           </section>
           <section>
             <h2 class="air">PROGRAM <small>● ON AIR</small></h2>
@@ -59,6 +64,10 @@
                 <span id="remainingLabel" class="timing-label">残り時間</span
                 ><strong id="programRemaining">--:--.-</strong>
               </div>
+            </div>
+            <div class="video-transport" aria-label="PROGRAM動画操作">
+              <div><button id="programPause" disabled>一時停止</button><button id="programResume" disabled>再開</button></div>
+              <small>OUTの映像・音声を同期して一時停止／再開</small>
             </div>
           </section>
         </div>
