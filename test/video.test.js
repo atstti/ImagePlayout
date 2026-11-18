@@ -95,6 +95,34 @@ test("動画登録：MP4/WebM・音声/時間メタデータ・Range・偽装拒
   restored.wss.close();
 });
 
+test("動画上限：初期2GB・認証・変更・検証・旧クライアント・再起動復元", async (t) => {
+  const f = await setup(t);
+  const settings = { ...f.store.state.settings };
+  assert.equal(settings.maxVideoUploadMB, 2048);
+  const denied = await fetch(f.base + "/api/settings", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...settings, maxVideoUploadMB: 1 }),
+  });
+  assert.equal(denied.status, 401);
+  for (const invalid of [0, -1, 1.5, 65537, "2048"]) {
+    assert.equal((await f.api("settings", { ...settings, maxVideoUploadMB: invalid })).status, 400);
+    assert.equal(f.store.state.settings.maxVideoUploadMB, 2048);
+  }
+  assert.equal((await f.api("settings", { ...settings, maxVideoUploadMB: 1 })).status, 200);
+  const large = Buffer.concat([fs.readFileSync(fixturePath("sample.mp4")), Buffer.alloc(1024 * 1024)]);
+  const rejected = await f.upload("large.mp4", large);
+  assert.equal(rejected.status, 400);
+  assert.match((await rejected.json()).error, /動画は1MB以下/);
+  assert.deepEqual(fs.readdirSync(path.join(f.dir, "uploads")), []);
+  assert.equal((await f.upload("sample.mp4")).status, 201);
+  const legacy = { ...settings }; delete legacy.maxVideoUploadMB;
+  assert.equal((await f.api("settings", legacy)).status, 200);
+  assert.equal(f.store.state.settings.maxVideoUploadMB, 1);
+  assert.equal(new Store(f.dir).state.settings.maxVideoUploadMB, 1);
+  assert.equal((await f.api("settings", { ...settings, maxVideoUploadMB: 2048 })).status, 200);
+  assert.equal(new Store(f.dir).state.settings.maxVideoUploadMB, 2048);
+});
+
 test("時間表示：0・分/時またぎ・残り0・未設定", () => {
   assert.equal(formatTime(0), "00:00.0");
   assert.equal(formatTime(4.018), "00:04.0");
@@ -125,8 +153,11 @@ test(
     page.setDefaultTimeout(15000);
     await page.waitForFunction(() => document.querySelector("#preview video")?.readyState >= 3);
     assert.equal(await page.locator("#videoLoop").isChecked(), false);
+    assert.equal(await page.locator("#maxVideoUploadMB").inputValue(), "2048");
+    await page.locator("#maxVideoUploadMB").fill("1024");
     await page.locator("#videoLoop").check();
     await page.locator("#saveSettings").click();
+    await page.waitForFunction(() => document.querySelector("#uploadLimit").textContent === "動画1024MBまで");
     const receiver = await browser.newPage();
     await receiver.goto(f.base + "/receiver?transparent=1");
     receiver.setDefaultTimeout(15000);

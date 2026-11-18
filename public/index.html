@@ -25,7 +25,7 @@
           /></label>
         </div>
         <p class="hint">
-          画像・動画をクリックしてPREVIEWに設定。ドラッグ＆ドロップでも登録できます。画像30MB・動画500MBまで。
+          画像・動画をクリックしてPREVIEWに設定。ドラッグ＆ドロップでも登録できます。画像30MB・<span id="uploadLimit">動画2GBまで</span>。
         </p>
         <div id="library"></div>
       </section>
@@ -111,7 +111,8 @@
             ><input id="monitorAudio" type="checkbox" />
             操作画面で音声を聴く</label
           >
-          <span class="hint">OUT音声・ループは「設定保存」で反映</span>
+          <label>動画上限（MB） <input id="maxVideoUploadMB" type="number" min="1" max="65536" step="1" value="2048" /></label>
+          <span class="hint">2048MB＝2GB。音声・ループ・容量上限は「設定保存」で反映</span>
         </section>
         <p id="error" role="alert"></p>
         <section>

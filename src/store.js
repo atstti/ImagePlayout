@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 export class Store {
-  constructor(dir, fadeMs = 500) {
+  constructor(dir, fadeMs = 500, maxVideoUploadMB = 2048) {
     this.dir = dir;
     fs.mkdirSync(path.join(dir, "images"), { recursive: true });
     this.file = path.join(dir, "state.json");
@@ -21,6 +21,7 @@ export class Store {
         };
     // Existing saved states used null for BLACK; retain that behavior.
     this.state.outputMode ??= this.state.program ? "image" : "black";
+    this.state.settings.maxVideoUploadMB ??= maxVideoUploadMB;
     this.state.settings.videoLoop ??= false;
     this.state.settings.videoMuted ??= false;
     this.state.programStartedAt ??= null;

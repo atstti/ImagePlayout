@@ -11,13 +11,13 @@ import { Store } from "./store.js";
 import { transparentOutputUrl } from "./network.js";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const config = {
-  maxVideoUploadMB: 500,
+  maxVideoUploadMB: 2048,
   videoPreloadTimeoutMs: 20000,
   ...JSON.parse(fs.readFileSync(path.join(root, "config.json"))),
 };
 export function createApp(options = {}) {
   const dir = options.dir || process.env.DATA_DIR || path.join(root, "data");
-  const store = new Store(dir, config.fadeMs);
+  const store = new Store(dir, config.fadeMs, config.maxVideoUploadMB);
   const s = store.state;
   const tempDir = path.join(dir, "uploads");
   fs.mkdirSync(tempDir, { recursive: true });
@@ -120,23 +120,27 @@ export function createApp(options = {}) {
     });
   });
   app.get("/api/state", (req, res) => res.json(status()));
-  const upload = multer({
-    storage: multer.diskStorage({
-      destination: tempDir,
-      filename: (req, file, callback) => callback(null, randomUUID()),
-    }),
-    limits: {
-      fileSize:
-        Math.max(config.maxUploadMB, config.maxVideoUploadMB) * 1024 * 1024,
-      files: 1,
-      fields: 0,
-    },
-  });
-  app.post("/api/images", upload.single("image"), async (req, res, next) => {
+  const upload = (req, res, next) => {
+    // Freeze the limits for this upload even if another operator saves settings.
+    req.uploadConfig = { ...config, maxVideoUploadMB: s.settings.maxVideoUploadMB };
+    multer({
+      storage: multer.diskStorage({
+        destination: tempDir,
+        filename: (req, file, callback) => callback(null, randomUUID()),
+      }),
+      limits: {
+        fileSize:
+          Math.max(config.maxUploadMB, req.uploadConfig.maxVideoUploadMB) * 1024 * 1024,
+        files: 1,
+        fields: 0,
+      },
+    }).single("image")(req, res, next);
+  };
+  app.post("/api/images", upload, async (req, res, next) => {
     let destination;
     try {
       if (!req.file) throw Error("画像または動画ファイルを指定してください");
-      const metadata = await inspectMedia(req.file, config);
+      const metadata = await inspectMedia(req.file, req.uploadConfig);
       const img = {
         id: randomUUID(),
         name: Buffer.from(req.file.originalname, "latin1")
@@ -215,6 +219,9 @@ export function createApp(options = {}) {
   app.post("/api/settings", (req, res, next) => {
     try {
       const { fit, background, fadeMs, take } = req.body;
+      const maxVideoUploadMB = req.body.maxVideoUploadMB ?? s.settings.maxVideoUploadMB;
+      if (!Number.isInteger(maxVideoUploadMB) || maxVideoUploadMB < 1 || maxVideoUploadMB > 65536)
+        throw Error("動画の容量上限は1〜65536MBの整数で指定してください");
       const videoLoop = req.body.videoLoop ?? s.settings.videoLoop;
       const videoMuted = req.body.videoMuted ?? s.settings.videoMuted;
       if (
@@ -228,7 +235,7 @@ export function createApp(options = {}) {
         typeof videoMuted !== "boolean"
       )
         throw Error("表示設定が不正です");
-      s.settings = { fit, background, fadeMs, take, videoLoop, videoMuted };
+      s.settings = { fit, background, fadeMs, take, videoLoop, videoMuted, maxVideoUploadMB };
       store.save();
       sync();
       res.json({ ok: true });
@@ -310,7 +317,7 @@ export function createApp(options = {}) {
     res.status(400).json({
       error:
         err.code === "LIMIT_FILE_SIZE"
-          ? `画像は${config.maxUploadMB}MB、動画は${config.maxVideoUploadMB}MB以下にしてください`
+          ? `画像は${config.maxUploadMB}MB、動画は${req.uploadConfig?.maxVideoUploadMB ?? s.settings.maxVideoUploadMB}MB以下にしてください`
           : err.message || "処理に失敗しました",
     }),
   );

@@ -239,6 +239,13 @@ async function main() {
     assert.equal(blackAlpha.min, 255);
     assert.equal(blackAlpha.max, 255);
     assert.deepEqual(await commandGeometry(), beforeClear);
+    assert.equal(await page.locator("#videoLoop").isChecked(), false);
+    assert.equal(await page.locator("#maxVideoUploadMB").inputValue(), "2048");
+    await page.locator("#maxVideoUploadMB").fill("4096");
+    await page.locator("#saveSettings").click();
+    await page.waitForFunction(() => document.querySelector("#uploadLimit").textContent === "動画4096MBまで");
+    await page.reload();
+    await page.waitForFunction(() => document.querySelector("#maxVideoUploadMB").value === "4096");
     // Upload a real H.264/AAC clip through the packaged WASM validator.
     await page
       .locator("#upload")

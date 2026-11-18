@@ -104,7 +104,7 @@ function render() {
       duration: 0,
     });
   }
-  for (const key of ["fit", "background", "fadeMs", "take"]) {
+  for (const key of ["fit", "background", "fadeMs", "take", "maxVideoUploadMB"]) {
     if (!settingsDirty && document.activeElement !== $(key))
       $(key).value = state.settings[key];
   }
@@ -112,6 +112,7 @@ function render() {
     $("videoAudio").checked = state.settings.videoMuted !== true;
     $("videoLoop").checked = state.settings.videoLoop === true;
   }
+  $("uploadLimit").textContent = `動画${state.settings.maxVideoUploadMB}MBまで`;
   const library = $("library");
   const signature = JSON.stringify(state.images);
   if (signature !== librarySignature) {
@@ -241,6 +242,7 @@ for (const key of [
   "background",
   "fadeMs",
   "take",
+  "maxVideoUploadMB",
   "videoAudio",
   "videoLoop",
 ]) {
@@ -254,6 +256,7 @@ $("saveSettings").onclick = () =>
     background: $("background").value,
     fadeMs: Number($("fadeMs").value),
     take: $("take").value,
+    maxVideoUploadMB: Number($("maxVideoUploadMB").value),
     videoLoop: $("videoLoop").checked,
     videoMuted: !$("videoAudio").checked,
   })
