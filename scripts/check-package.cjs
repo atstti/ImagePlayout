@@ -254,6 +254,10 @@ async function main() {
       await page.locator("#preview video").evaluate((v) => v.paused && v.muted),
       true,
     );
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#previewDuration").textContent === "00:04.0",
+    );
     assert.equal(
       await page.locator("#previewDuration").textContent(),
       "00:04.0",

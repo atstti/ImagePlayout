@@ -206,6 +206,7 @@ function render() {
     row.textContent = `${p.connected ? "● 接続中" : "○ 切断"} ${p.address} / ${p.id.slice(0, 8)} ｜ 最終応答 ${new Date(p.lastSeen).toLocaleTimeString("ja-JP")} ｜ 画像ID ${p.imageId || (p.outputMode === "clear" ? "CLEAR（透明）" : p.outputMode === "black" ? "BLACK" : "未確認")} ｜ SEQ ${p.seq}${p.playback ? " ｜ 動画 " + formatTime(p.playback.currentTime) + " / " + formatTime(p.playback.duration) + " 残り " + formatRemaining(p.playback.duration, p.playback.currentTime) + (p.playback.muted ? "（無音）" : "（音声ON）") : ""}${p.error ? " ｜ エラー: " + p.error : ""}`;
     $("receivers").append(row);
   }
+  updateTiming();
 }
 connect(
   "admin",
@@ -405,7 +406,10 @@ function updateTiming() {
     : state.outputMode === "clear"
       ? "CLEAR"
       : state.program
-        ? "静止画"
+        ? state.images.find((item) => item.id === state.program)?.kind ===
+          "video"
+          ? "準備中"
+          : "静止画"
         : "BLACK";
   const failed = state.receivers.find((peer) => peer.connected && peer.error);
   $("programPlaybackState").classList.toggle("playback-warning", !!failed);
